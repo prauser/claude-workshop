@@ -2,186 +2,157 @@
 
 > 상위 문서: [design.md](design.md)
 > 배포 위치: 각 프로젝트 레포의 `.claude/hooks/`
+> 실험 결과 반영: 2026-04-07
 
 ## 설계 원칙
 
+1. Hook은 품질 게이트만 담당 (포맷, 빌드, 테스트)
+2. 로깅은 session jsonl 후처리로 — Hook으로 쌓지 않음
+3. 무거운 체크는 Hook에 넣지 않음 → PR 생성 시점으로
+
+---
+
+## Hook 기본 동작
+
+### 데이터 전달
+
+**stdin JSON**으로 전달. 환경변수 아님.
+
+```json
+{
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Edit",
+  "tool_input": { "file_path": "...", "old_string": "...", "new_string": "..." },
+  "tool_response": { "filePath": "...", "structuredPatch": [...] }
+}
 ```
-1. 에이전트는 구현에 집중, 로깅은 Hook이 담당
-2. Hook은 자동 — 에이전트가 깜빡해도 실행됨
-3. 품질 게이트는 건너뛸 수 없음
-4. orchestrate.md 수정 없이 로깅 추가/변경 가능
+
+유용한 환경변수: `$CLAUDE_PROJECT_DIR`만.
+
+### 차단 (PreToolUse)
+
+| exit code | 동작 |
+|-----------|------|
+| 0 | 통과 |
+| **2** | **차단**, stderr → Claude 피드백 |
+| 그 외 | 통과 (에러 로깅만) |
+
+### matcher
+
+- 도구 이름 문자열: `"Bash"`, `"Edit|Write"`, `"Agent"`
+- `if` 필드로 명령 패턴: `"Bash(git commit*)"`, `"Bash(gh pr create*)"`
+
+### settings.json 구조
+
+```
+hooks → [{ matcher, hooks: [{ type, command, if? }] }]
 ```
 
 ---
 
-## settings.json 구조
+## settings.json
 
 ```jsonc
-// {repo}/.claude/settings.json
 {
   "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": { "tool": "Agent" },
-        "command": "bash .claude/hooks/log-agent-usage.sh"
-      },
-      {
-        "matcher": { "tool": ["Edit", "Write"] },
-        "command": "bash .claude/hooks/log-file-change.sh"
-      },
-      {
-        "matcher": { "tool": ["Edit", "Write"] },
-        "command": "bash .claude/hooks/run-related-tests.sh"
-      }
-    ],
     "PreToolUse": [
       {
-        "matcher": { "tool": "Bash", "command_pattern": "git commit" },
-        "command": "bash .claude/hooks/pre-commit-lint.sh"
+        "matcher": "Bash",
+        "hooks": [{ "type": "command", "if": "Bash(git commit*)", "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/pre-commit-format.sh" }]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [{ "type": "command", "if": "Bash(gh pr create*)", "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/pre-pr-validate.sh" }]
       }
     ]
   }
 }
 ```
 
-> 주의: matcher 문법과 환경변수는 Claude Code 버전에 따라 다를 수 있음.
-> experiments/ 단계에서 실제 동작 검증 필수.
-
 ---
 
-## Hook 스크립트 상세
+## Hook 스크립트
 
-### log-agent-usage.sh — 에이전트 토큰 기록
-
-```bash
-#!/bin/bash
-# PostToolUse(Agent) 시 실행
-# Agent 호출의 토큰 사용량을 metrics.jsonl에 기록
-
-# TODO: Claude Code가 Hook에 전달하는 환경변수 확인 필요
-# 예상: $TOOL_NAME, $TOOL_RESULT 또는 stdin으로 전달
-
-TICKET_FILE=".claude/current-ticket"
-TICKET=$(cat "$TICKET_FILE" 2>/dev/null || echo "unknown")
-LOG_REPO=$(grep -A1 "log_repo" CLAUDE.md 2>/dev/null | tail -1 | tr -d '| ' || echo "../impl-logs")
-REPO_NAME=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" || echo "unknown")
-
-LOG_DIR="${LOG_REPO}/${REPO_NAME}/${TICKET}"
-mkdir -p "$LOG_DIR"
-
-# usage 데이터 파싱 후 append
-# 실제 구현은 experiments 단계에서 Hook 환경변수 확인 후 결정
-echo "{\"ts\":\"$(date -Iseconds)\",\"type\":\"agent\",\"ticket\":\"${TICKET}\"}" \
-  >> "$LOG_DIR/metrics.jsonl"
-```
-
-### log-file-change.sh — 코드 변경 기록
+### pre-commit-format.sh
 
 ```bash
 #!/bin/bash
-# PostToolUse(Edit/Write) 시 실행
-# 어떤 파일이 변경되었는지 changes.jsonl에 기록
-
-# TODO: $FILE 환경변수 전달 방식 확인 필요
-
-TICKET_FILE=".claude/current-ticket"
-TICKET=$(cat "$TICKET_FILE" 2>/dev/null || echo "unknown")
-LOG_REPO=$(grep -A1 "log_repo" CLAUDE.md 2>/dev/null | tail -1 | tr -d '| ' || echo "../impl-logs")
-REPO_NAME=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" || echo "unknown")
-
-LOG_DIR="${LOG_REPO}/${REPO_NAME}/${TICKET}"
-mkdir -p "$LOG_DIR"
-
-echo "{\"ts\":\"$(date -Iseconds)\",\"type\":\"file_change\",\"ticket\":\"${TICKET}\"}" \
-  >> "$LOG_DIR/changes.jsonl"
-```
-
-### run-related-tests.sh — 편집 후 관련 테스트 실행
-
-```bash
-#!/bin/bash
-# PostToolUse(Edit/Write) 시 실행
-# 변경된 파일과 관련된 테스트를 자동 실행
-
-# TODO: 프로젝트별 테스트 명령은 CLAUDE.md Implementation Config에서 읽기
-# TODO: "관련 테스트" 판별 로직 (파일명 기반, 디렉토리 기반 등)
-
-TEST_CMD=$(grep -A1 "test_command" CLAUDE.md 2>/dev/null | tail -1 | tr -d '| ')
-
-if [ -n "$TEST_CMD" ]; then
-  # 관련 테스트만 실행 (전체 테스트 스위트가 아님)
-  # 실제 구현은 프로젝트별 테스트 구조에 따라 다름
-  echo "[Hook] 관련 테스트 실행: $TEST_CMD"
-  # eval "$TEST_CMD" -- 실제 적용 시 활성화
+FORMAT_CMD=$(grep -A1 "format_command" "$CLAUDE_PROJECT_DIR/CLAUDE.md" 2>/dev/null | tail -1 | tr -d '| ')
+if [ -n "$FORMAT_CMD" ]; then
+  eval "$FORMAT_CMD"
+  if [ $? -ne 0 ]; then
+    echo "포맷 체크 실패" >&2
+    exit 2
+  fi
 fi
 ```
 
-### pre-commit-lint.sh — 커밋 전 린트
+### pre-pr-validate.sh
 
 ```bash
 #!/bin/bash
-# PreToolUse(Bash: git commit) 시 실행
-# staged 파일에 대해 린트 실행, 실패 시 커밋 차단
-
-LINT_CMD=$(grep -A1 "lint_command" CLAUDE.md 2>/dev/null | tail -1 | tr -d '| ')
-
-if [ -n "$LINT_CMD" ]; then
-  echo "[Hook] 린트 실행: $LINT_CMD"
-  # eval "$LINT_CMD" -- 실제 적용 시 활성화
-  # 실패 시 exit 1 → 커밋 차단
+BUILD_CMD=$(grep -A1 "build_command" "$CLAUDE_PROJECT_DIR/CLAUDE.md" 2>/dev/null | tail -1 | tr -d '| ')
+TEST_CMD=$(grep -A1 "test_command" "$CLAUDE_PROJECT_DIR/CLAUDE.md" 2>/dev/null | tail -1 | tr -d '| ')
+FAILED=0
+[ -n "$BUILD_CMD" ] && { eval "$BUILD_CMD" || FAILED=1; }
+[ -n "$TEST_CMD" ] && [ $FAILED -eq 0 ] && { eval "$TEST_CMD" || FAILED=1; }
+if [ $FAILED -ne 0 ]; then
+  echo "빌드/테스트 실패" >&2
+  exit 2
 fi
 ```
 
-### sync-logs.sh — 완료 후 로그 동기화
+### sync-logs.sh
 
 ```bash
 #!/bin/bash
-# orchestrate 완료 후 수동 호출 또는 Hook으로 트리거
-# .claude/tasks/done/ → impl-logs/{repo}/{ticket}/ 복사 + git push
-
+# impl 완료 후 수동 호출
+# 프로젝트 레포의 플랜 + 태스크 결과 + session jsonl을 impl-logs로 동기화
 TICKET=$1
-REPO_NAME=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" || echo "unknown")
+REPO_NAME=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)")
 LOG_REPO=$(grep -A1 "log_repo" CLAUDE.md 2>/dev/null | tail -1 | tr -d '| ' || echo "../impl-logs")
-
 LOG_DIR="${LOG_REPO}/${REPO_NAME}/${TICKET}"
 mkdir -p "$LOG_DIR/steps"
-
-# 태스크 결과 복사
+cp .claude/plans/${TICKET}/plan*.md "$LOG_DIR/" 2>/dev/null
 cp .claude/tasks/done/* "$LOG_DIR/steps/" 2>/dev/null
-
-# 커밋 & 푸시
-cd "$LOG_REPO" || exit 1
-git add -A
-git commit -m "log: ${REPO_NAME}/${TICKET}" 2>/dev/null
-git push 2>/dev/null
-
-echo "[Hook] 로그 동기화 완료: ${REPO_NAME}/${TICKET}"
+cd "$LOG_REPO" && git add -A && git commit -m "log: ${REPO_NAME}/${TICKET}" 2>/dev/null && git push 2>/dev/null
 ```
 
 ---
 
 ## current-ticket 관리
 
-`/implement`가 시작할 때 `.claude/current-ticket`에 티켓 번호를 기록.
-모든 Hook 스크립트가 이 파일을 읽어서 로그 경로를 결정.
+소유권: `/impl`. spec-plan은 plan.md에 티켓 포함 후 종료.
 
 ```
-/implement OVDR-1234 시작
-  → echo "OVDR-1234" > .claude/current-ticket
-
-orchestrate 완료
-  → sync-logs.sh OVDR-1234
-  → rm .claude/current-ticket
+/spec-plan OVDR-1234 → .claude/plans/OVDR-1234/plan.md 저장 → 종료
+/impl OVDR-1234 → echo "OVDR-1234" > .claude/current-ticket
+impl 완료 → sync-logs.sh → rm .claude/current-ticket
 ```
+
+`.claude/current-ticket`은 `.gitignore` 필수. worktree 사용 시 자동 격리.
 
 ---
 
-## 검증 항목 (experiments 단계)
+## 로깅 전략
 
-| 항목 | 확인할 것 |
-|------|---------|
-| Hook 환경변수 | Claude Code가 PostToolUse Hook에 어떤 변수를 전달하는가 |
-| matcher 문법 | `tool`, `command_pattern` 등의 정확한 문법 |
-| 실행 컨텍스트 | Hook 스크립트의 cwd, PATH, 권한 |
-| 에러 처리 | Hook 실패 시 본 작업이 차단되는가, 무시되는가 |
-| 성능 영향 | 매 Edit마다 Hook 실행 시 체감 지연 |
+Hook으로 실시간 로깅하지 않음. session jsonl에 모든 tool call이 기록되므로:
+- changes (파일 변경): session jsonl에서 Edit/Write tool call 추출
+- metrics (에이전트 호출): session jsonl에서 Agent tool call 추출
+- 후처리 스크립트로 impl 완료 후 추출 → impl-logs에 저장
+
+session jsonl 경로: `~/.claude/projects/{project}/{session-id}.jsonl`
+
+---
+
+## 실험 결과 (2026-04-07)
+
+| # | 항목 | 핵심 발견 |
+|---|------|----------|
+| 1 | 데이터 전달 | stdin JSON. `jq` 파싱 필요 |
+| 2 | 차단 | exit 2 = 차단. stderr → Claude 피드백 |
+| 3 | matcher | 도구 이름 문자열 + `if` 필드 패턴 |
+| 4 | 서브에이전트 | 병렬 스폰 동작 확인 |
+| 5 | UE 성능 | [experiment-5-ue-hooks.md](../../experiments/impl-workflow/experiment-5-ue-hooks.md) |
+
+기타: Hook 설정은 세션 중 추가해도 즉시 반영. stdin에 `tool_response` 전체 포함.

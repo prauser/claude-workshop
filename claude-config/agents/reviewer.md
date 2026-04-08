@@ -22,6 +22,15 @@ Review the implemented code. Do not modify any files.
   <summary>{overall review summary}</summary>
 </review>
 
+## Prompt MD review
+If any output file matches these paths, spawn `md-reviewer` as subagent for additional review:
+- `**/commands/*.md`
+- `**/agents/*.md`
+- `**/skills/*/SKILL.md`
+- `**/CLAUDE.md`
+
+Include md-reviewer findings in the `<issues>` section.
+
 ## Rules
 - Do not modify any files
 - `critical` issues must set status to `needs-fix`

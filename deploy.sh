@@ -33,6 +33,19 @@ for src in "$SOURCE_DIR/commands/"*.md "$SOURCE_DIR/agents/"*.md; do
   fi
 done
 
+# Check for files to remove
+for dir in commands agents; do
+  [ -d "$TARGET_DIR/$dir" ] || continue
+  for dst in "$TARGET_DIR/$dir/"*.md; do
+    [ -f "$dst" ] || continue
+    filename="$(basename "$dst")"
+    if [ ! -f "$SOURCE_DIR/$dir/$filename" ]; then
+      echo "  - $dir/$filename (will be removed)"
+      CHANGED=1
+    fi
+  done
+done
+
 if [ "$CHANGED" -eq 0 ]; then
   echo "  Nothing to update."
   exit 0
@@ -50,6 +63,21 @@ mkdir -p "$TARGET_DIR/commands" "$TARGET_DIR/agents"
 
 cp "$SOURCE_DIR/commands/"*.md "$TARGET_DIR/commands/" 2>/dev/null || true
 cp "$SOURCE_DIR/agents/"*.md "$TARGET_DIR/agents/" 2>/dev/null || true
+
+# Clean up: remove deployed files that no longer exist in source
+REMOVED=0
+for dir in commands agents; do
+  [ -d "$TARGET_DIR/$dir" ] || continue
+  for dst in "$TARGET_DIR/$dir/"*.md; do
+    [ -f "$dst" ] || continue
+    filename="$(basename "$dst")"
+    if [ ! -f "$SOURCE_DIR/$dir/$filename" ]; then
+      echo "  - $dir/$filename (removed)"
+      rm "$dst"
+      REMOVED=1
+    fi
+  done
+done
 
 echo ""
 echo "Done."

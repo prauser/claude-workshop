@@ -1,0 +1,73 @@
+# Implementation Mode
+
+Execute implementation plans using specialist agents. Never write code directly.
+
+**Usage**: `/impl {TICKET}` or `/impl`
+
+## On activation
+
+1. Get ticket ID from argument, or ask user.
+2. Read `## Implementation Config` from CLAUDE.md → get `log_repo`.
+3. Look for `.claude/plans/{TICKET}/plan.md` in the project repo.
+   - Found: summarize as bullet points, confirm with user.
+   - Not found: ask user for spec directly, summarize, confirm.
+4. Record: `echo "{TICKET}" > .claude/current-ticket`
+
+## On debug/analysis request
+1. **Classify** — debugging (bug/symptom) or analysis (understanding).
+2. **Write task file** — `.claude/tasks/pending/task-{N}-{name}.md`
+3. **Delegate** — `debugger` for bugs, `analyzer` for understanding.
+4. **Report** — Present diagnosis/analysis to user.
+5. **If fix needed** — Proceed to implementation with diagnosis as context.
+
+## On implementation request
+1. **Decompose** — Feature-level tasks (not file-level). Order by dependencies. Get approval.
+2. **Write task files** — `.claude/tasks/pending/task-{N}-{name}.md`:
+   ```
+   ## Context
+   {spec summary, self-contained}
+   ## Goal
+   {what to implement}
+   ## Inputs
+   - Ref files: {paths}
+   - Prior task results: {.claude/tasks/done/ paths if any}
+   ## Outputs
+   - Create: {paths}
+   - Modify: {paths}
+   ## Verification
+   - [ ] Write tests ({path})
+   - [ ] All tests pass
+   - [ ] {feature-specific checks}
+   ## On completion
+   Write `.claude/tasks/done/task-{N}-{name}-result.md`:
+   <r>
+     <status>success | failure</status>
+     <files><file path="{path}">{description}</file></files>
+     <tests passed="{N}" failed="{N}"><failure>{name}</failure></tests>
+     <decisions>{decisions made}</decisions>
+     <handoff>{for next task}</handoff>
+   </r>
+   ```
+3. **Execute sequentially** — For each task:
+   - Delegate to `implementer` → then `reviewer`
+   - If `needs-fix`: re-delegate to `implementer` with review
+   - On failure: move to `.claude/tasks/failed/`, ask user
+4. **Integration** — After all tasks, delegate to `integrator`
+5. **Final report** — Features, test results, failures, next steps
+
+## On completion
+1. `rm .claude/current-ticket`
+2. If `log_repo` configured, remind user to run `sync-logs.sh {TICKET}`.
+
+## Agents
+- `debugger` — root cause diagnosis (read-only, opus)
+- `analyzer` — code structure/flow analysis (read-only, opus)
+- `implementer` — implementation + unit tests
+- `reviewer` — code quality, bugs, edge cases (read-only)
+- `integrator` — integration tests across all tasks
+
+## Rules
+- Never write code. Always delegate.
+- Pull only result summaries into this context, not full code.
+- If spec changes, update affected pending task files.
+- Ensure `.claude/current-ticket` is in `.gitignore`.
