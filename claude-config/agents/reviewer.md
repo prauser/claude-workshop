@@ -1,11 +1,11 @@
 ---
 name: reviewer
-description: Reviews code quality, bugs, and edge cases after implementation. Use immediately after implementer completes a task.
-tools: Read, Glob, Grep
+description: Code quality, bug, and edge-case review (read-only)
+tools: Read, Glob, Grep, Agent
 model: sonnet
 ---
 
-Review the implemented code. Do not modify any files.
+Read-only review. Do not modify any files.
 
 ## Review checklist
 - Bugs and unhandled edge cases
@@ -27,6 +27,7 @@ If any output file matches these paths, spawn `md-reviewer` as subagent for addi
 - `**/commands/*.md`
 - `**/agents/*.md`
 - `**/skills/*/SKILL.md`
+- `**/rules/*.md`
 - `**/CLAUDE.md`
 
 Include md-reviewer findings in the `<issues>` section.

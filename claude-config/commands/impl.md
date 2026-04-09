@@ -1,18 +1,18 @@
 # Implementation Mode
 
-Execute implementation plans using specialist agents. Never write code directly.
+Orchestrate implementation via specialist agents. Never write code directly. Pull only result summaries into this context, not full code.
 
-**Usage**: `/impl {TICKET}`, `/impl {free text}`, or `/impl`
+**Usage**: `/impl {TICKET}` | `/impl {description}` | `/impl`
 
 ## On activation
 
 1. Parse argument:
-   - **Ticket pattern** (e.g. `OVDR-1234`, `QA-56`): look for `.claude/plans/{TICKET}/plan.md`.
+   - **Ticket pattern** (e.g. `OVDR-1234`): load `.claude/plans/{TICKET}/plan.md`.
      - Found: summarize as bullet points, confirm with user, proceed.
-     - Not found: fall through to spec discussion below.
-   - **Free text** (e.g. "fix login bug"): use as initial context for spec discussion.
+     - Not found: proceed to spec discussion.
+   - **Free text**: use as initial context for spec discussion.
    - **No argument**: ask user what to implement.
-2. **Spec discussion** (when no plan.md): discuss requirements with user until spec is clear. Summarize as bullet points, confirm.
+2. **Spec discussion** (when no plan.md): elicit requirements, summarize as bullets, confirm.
 3. Record ticket if applicable: `echo "{TICKET}" > .claude/current-ticket`
 
 ## On debug/analysis request
@@ -42,13 +42,13 @@ Execute implementation plans using specialist agents. Never write code directly.
    - [ ] {feature-specific checks}
    ## On completion
    Write `.claude/tasks/done/task-{N}-{name}-result.md`:
-   <r>
+   <result>
      <status>success | failure</status>
      <files><file path="{path}">{description}</file></files>
      <tests passed="{N}" failed="{N}"><failure>{name}</failure></tests>
      <decisions>{decisions made}</decisions>
      <handoff>{for next task}</handoff>
-   </r>
+   </result>
    ```
 3. **Execute sequentially** — For each task:
    - Delegate to `implementer` → then `reviewer`
@@ -65,12 +65,10 @@ Execute implementation plans using specialist agents. Never write code directly.
 ## Agents
 - `debugger` — root cause diagnosis (read-only, opus)
 - `analyzer` — code structure/flow analysis (read-only, opus)
-- `implementer` — implementation + unit tests
-- `reviewer` — code quality, bugs, edge cases (read-only)
-- `integrator` — integration tests across all tasks
+- `implementer` — implementation + unit tests (sonnet)
+- `reviewer` — code quality, bugs, edge cases (read-only, sonnet)
+- `integrator` — integration tests across all tasks (sonnet)
 
 ## Rules
 - Never write code. Always delegate.
-- Pull only result summaries into this context, not full code.
 - If spec changes, update affected pending task files.
-- Ensure `.claude/current-ticket` is in `.gitignore`.
