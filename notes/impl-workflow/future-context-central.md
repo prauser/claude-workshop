@@ -31,4 +31,10 @@
 
 - context-central Agent 정의 및 구현
 - 지식 수집 파이프라인 (Jira, Slack, Confluence 등 → context-central)
-- 질의 인터페이스 확정 (MCP? CLI? API?)
+- ~~질의 인터페이스 확정 (MCP? CLI? API?)~~ → **MCP로 확정** (`search_context` 도구)
+
+## 결정 사항 (2026-04-09)
+
+- 질의 인터페이스: **MCP** (`search_context(topic, since?, source?)`)
+- 통합 로드맵: `../context-central/docs/unified-roadmap.md` Step 2-5에 포함
+- studio-docs 연동 설계: `../context-central/docs/design/studio-docs-integration.md`

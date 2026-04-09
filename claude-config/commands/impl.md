@@ -2,16 +2,18 @@
 
 Execute implementation plans using specialist agents. Never write code directly.
 
-**Usage**: `/impl {TICKET}` or `/impl`
+**Usage**: `/impl {TICKET}`, `/impl {free text}`, or `/impl`
 
 ## On activation
 
-1. Get ticket ID from argument, or ask user.
-2. Read `## Implementation Config` from CLAUDE.md → get `log_repo`.
-3. Look for `.claude/plans/{TICKET}/plan.md` in the project repo.
-   - Found: summarize as bullet points, confirm with user.
-   - Not found: ask user for spec directly, summarize, confirm.
-4. Record: `echo "{TICKET}" > .claude/current-ticket`
+1. Parse argument:
+   - **Ticket pattern** (e.g. `OVDR-1234`, `QA-56`): look for `.claude/plans/{TICKET}/plan.md`.
+     - Found: summarize as bullet points, confirm with user, proceed.
+     - Not found: fall through to spec discussion below.
+   - **Free text** (e.g. "fix login bug"): use as initial context for spec discussion.
+   - **No argument**: ask user what to implement.
+2. **Spec discussion** (when no plan.md): discuss requirements with user until spec is clear. Summarize as bullet points, confirm.
+3. Record ticket if applicable: `echo "{TICKET}" > .claude/current-ticket`
 
 ## On debug/analysis request
 1. **Classify** — debugging (bug/symptom) or analysis (understanding).
@@ -50,7 +52,8 @@ Execute implementation plans using specialist agents. Never write code directly.
    ```
 3. **Execute sequentially** — For each task:
    - Delegate to `implementer` → then `reviewer`
-   - If `needs-fix`: re-delegate to `implementer` with review
+   - If `needs-fix`: re-delegate to `implementer` with review (max 3 rounds)
+   - After 3 rounds still `needs-fix`: escalate to user with both implementation and review context
    - On failure: move to `.claude/tasks/failed/`, ask user
 4. **Integration** — After all tasks, delegate to `integrator`
 5. **Final report** — Features, test results, failures, next steps
