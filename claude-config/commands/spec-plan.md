@@ -20,7 +20,7 @@ Used by Spec Agent and Code Agent:
 
 ## Step 0 — Context gathering (parallel)
 
-Spawn 4 read-only subagents in parallel:
+Spawn 5 read-only subagents in parallel:
 
 **[Jira Agent]** (sonnet)
 - `jira-tools get {TICKET}` via Bash (returns JSON)
@@ -39,6 +39,8 @@ Spawn 4 read-only subagents in parallel:
 - Search `log_repo` for past similar work logs
 - Return: related knowledge, past learnings
 
+**[Test Agent]** (sonnet) — spawn `test-engineer` in Strategy mode; return its `<test-plan>` output
+
 ## Step 1 — Draft plan
 
 Synthesize into:
@@ -50,17 +52,30 @@ Synthesize into:
 - P0: [items]
 - P1: [items]
 
+### Out of Scope
+- [explicit "won't do" items for this ticket]
+
 ### Impact scope
 - Files to modify: [list]
 - Dependencies: [modules]
 - Risks: [areas]
 
 ### Task breakdown
-1. {task} — complexity: {low/mid/high}, depends: {none or task N}
+1. {task} — size: {XS/S/M/L/XL}, depends: {none or task N}
 
-### Test strategy
-- Unit: [targets]
-- Integration: [targets]
+Sizing: XS: 1 file | S: 2-3 files | M: module-level | L: cross-module | XL: must split
+
+### Test Strategy
+- Unit: [targets from Test Agent]
+- Integration: [targets from Test Agent]
+- E2E: [critical user flows from Test Agent]
+- Risk areas: [high-priority test targets]
+
+### Quality Gates
+- [ ] All tests pass
+- [ ] No regressions in affected modules
+- [ ] Coverage maintained or improved on changed files
+- [ ] Build succeeds
 
 ### Open questions
 - [decisions needed]
@@ -75,6 +90,7 @@ Conflict types:
 | A | Code vs Spec | Code Agent flags high risk on a Spec Agent P0 item |
 | B | Code vs Tests | edit order conflicts with existing test dependencies |
 | C | Jira vs Code | deadline vs prerequisite refactoring |
+| D | Test vs Code | Test Agent recommended level conflicts with Code Agent's identified coverage or risk assessment |
 
 On conflict: pass opposing result to each agent → re-analyze. Max 3 rounds.
 Unresolved after 3 rounds → present both opinions in Step 3.
@@ -94,7 +110,4 @@ Present plan summary. User can:
 
 ## Error handling
 
-| Situation | Response |
-|-----------|----------|
-| PRD/TechSpec not found | Skip Spec Agent, plan with Code + Jira only |
-| No Implementation Config | Skip Spec and Context agents |
+Missing config or PRD → skip the relevant agent and proceed with remaining data.

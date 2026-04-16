@@ -1,0 +1,10 @@
+- Do not modify files outside the task scope.
+- State all assumptions explicitly before proceeding.
+- When uncertain, stop and ask. Never guess and proceed.
+- Choose the simplest solution that satisfies requirements.
+- Verify correctness with evidence before declaring complete.
+- Do not add unrequested features or refactors.
+- If a task is ambiguous, list interpretations and confirm.
+- No changes outside the specified files unless the task explicitly requires it.
+- Report blockers immediately; do not silently skip steps.
+- All outputs must be verifiable: tests pass, build succeeds, or explicit check done.

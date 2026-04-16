@@ -36,6 +36,8 @@ Orchestrate implementation via specialist agents. Never write code directly. Pul
    ## Outputs
    - Create: {paths}
    - Modify: {paths}
+   ## Reference Guidelines
+   - {paths from CLAUDE.md guidelines: list, if configured}
    ## Verification
    - [ ] Write tests ({path})
    - [ ] All tests pass
@@ -55,19 +57,20 @@ Orchestrate implementation via specialist agents. Never write code directly. Pul
    - If `needs-fix`: re-delegate to `implementer` with review (max 3 rounds)
    - After 3 rounds still `needs-fix`: escalate to user with both implementation and review context
    - On failure: move to `.claude/tasks/failed/`, ask user
-4. **Integration** — After all tasks, delegate to `integrator`
+4. **Integration** — After all tasks, delegate to `integrator` with Quality Gates from plan.md's `### Quality Gates`
 5. **Final report** — Features, test results, failures, next steps
 
 ## On completion
 1. `rm .claude/current-ticket`
-2. If `log_repo` configured, remind user to run `sync-logs.sh {TICKET}`.
+2. If `log_repo` is configured in CLAUDE.md, remind user to run `sync-logs.sh {TICKET}`.
 
 ## Agents
-- `debugger` — root cause diagnosis (read-only, opus)
+- `debugger` — 6-step triage protocol (read-only, opus)
 - `analyzer` — code structure/flow analysis (read-only, opus)
-- `implementer` — implementation + unit tests (sonnet)
+- `implementer` — incremental slice + TDD + atomic commits (sonnet)
 - `reviewer` — code quality, bugs, edge cases (read-only, sonnet)
 - `integrator` — integration tests across all tasks (sonnet)
+- `test-engineer` — test strategy/coverage analysis (read-only, sonnet)
 
 ## Rules
 - Never write code. Always delegate.
