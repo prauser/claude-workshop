@@ -1,9 +1,11 @@
 # Manifest Schema
 
 > File: `.claude/runs/{TICKET}/manifest.yaml`  
-> Owner: integrator finalizes; runner may create the initial stub
+> Owner: integrator finalizes; runner can create the initial stub
 
 `manifest.yaml` binds ticket-level workflow runs, plan revisions, provider sessions, artifacts, and quality gate evidence.
+
+Claude-native adapters let the integrator create the manifest from scratch at integration time. Wrapper-based adapters, including the first Codex validation runner, can create a stub earlier and let the integrator finalize it.
 
 ## Top-Level Fields
 
@@ -24,8 +26,8 @@ Fields:
 
 - `schema_version`: Contract version. Phase 0 uses `0.1`.
 - `ticket`: Ticket ID or synthetic validation ID.
-- `created_at`: ISO 8601 timestamp for manifest creation.
-- `updated_at`: ISO 8601 timestamp for last manifest update.
+- `created_at`: ISO 8601 timestamp.
+- `updated_at`: ISO 8601 timestamp.
 - `status`: `pending`, `success`, `failure`, or `partial`.
 - `workflow_runs`: Ordered list of `spec-plan`, `impl`, or validation runs.
 - `quality_gates`: Final gate evidence from the integrator.
@@ -78,7 +80,7 @@ Rules:
 - Artifact paths are repository-relative.
 - `tasks` and `results` are ordered by task number.
 - `diff` and `test_output` are required for Phase 0 validation.
-- Provider-native logs may be recorded in extra fields, but auditors must not depend on them during Phase 0.
+- Provider-native logs can be recorded in extra fields, but auditors must not depend on them during Phase 0.
 
 ## Quality Gates
 
@@ -100,7 +102,7 @@ Fields:
 
 Rules:
 
-- Every plan quality gate should have one manifest entry.
+- Every plan quality gate must have one manifest entry.
 - `success` status requires every gate to be `pass`.
 - `skipped` requires a reason in `notes`.
 
@@ -118,6 +120,13 @@ Fields:
 - `status`: `not-run`, `pass`, `fail`, or `warning`.
 - `artifact`: Path to audit output, nullable.
 - `checked_at`: ISO 8601 timestamp, nullable before audit.
+
+Status meanings:
+
+- `not-run`: Not executed.
+- `pass`: Objective checks passed.
+- `warning`: A check found ambiguous evidence or a likely false positive that requires review.
+- `fail`: A hard contract violation was found, such as a missing result file, invalid schema, or changed file outside declared task outputs.
 
 ## Minimal Example
 

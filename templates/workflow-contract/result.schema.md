@@ -28,17 +28,31 @@ Fields:
 - `role`: `implementer`, `reviewer`, `integrator`, `debugger`, or `analyzer`.
 - `runner`: `claude-code`, `codex`, or another explicit adapter name.
 - `model`: Provider model name, or `mixed` if multiple models were used.
-- `status`: `success`, `failure`, `approved`, `needs-fix`, or `partial`.
+- `status`: Role-specific outcome status.
+  - `implementer`, `integrator`, `debugger`, `analyzer`: `success`, `failure`, or `partial`.
+  - `reviewer`: `approved` or `needs-fix`.
 - `started_at`: ISO 8601 timestamp.
 - `ended_at`: ISO 8601 timestamp.
 
 Rules:
 
-- Frontmatter is required for Phase 0 validation result files.
-- Unknown or unavailable values should be explicit, for example `model: unknown`.
-- Timestamps should use timezone offsets.
+- Unknown or unavailable values must be explicit, for example `model: unknown`.
+- Timestamps must use timezone offsets.
+- Auditors must interpret `status` according to `role`; reviewer results are not expected to use `success`.
 
-## Implementer Body
+## Body Compatibility
+
+Phase 0 keeps Claude-native workflow behavior unchanged. Existing canonical agents can continue to write XML bodies:
+
+- implementer: `<result>...</result>`
+- reviewer: `<review>...</review>`
+- integrator: `<integration-result>...</integration-result>`
+
+These XML bodies are valid result bodies when the required frontmatter is present. Fresh adapters use the markdown body sections below because they are easier for lightweight auditors to parse.
+
+Auditors must read frontmatter first, then parse either the existing XML body or the recommended markdown body for changed files, tests, findings, and gate evidence.
+
+## Recommended Implementer Body
 
 ```markdown
 ## Status
@@ -64,7 +78,7 @@ success | failure | partial
 Notes for reviewer or next task, or `none`.
 ```
 
-## Reviewer Body
+## Recommended Reviewer Body
 
 ```markdown
 ## Status
@@ -87,7 +101,7 @@ approved | needs-fix
 Overall verdict and key evidence.
 ```
 
-## Integrator Body
+## Recommended Integrator Body
 
 ```markdown
 ## Status
@@ -161,10 +175,10 @@ Ready for reviewer.
 
 ## Audit Notes
 
-The artifact-only auditor should be able to read:
+The artifact-only auditor must be able to read:
 
 - `status` from frontmatter and body
-- changed file paths from `## Files Changed`
-- test commands and evidence from `## Tests`
-- scope evidence from reviewer `## Scope Check`
-- gate evidence from integrator `## Quality Gates`
+- changed file paths from `## Files Changed` or `<files_modified>`
+- test commands and evidence from `## Tests` or XML test fields
+- scope evidence from reviewer `## Scope Check` or `<review>` issues
+- gate evidence from integrator `## Quality Gates` or `<integration-result><gates>`

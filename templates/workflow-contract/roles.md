@@ -5,7 +5,7 @@
 
 This file is a short provider-neutral role charter only. Do not duplicate full agent prompts here.
 
-Codex adapters may load the canonical Claude role prompts and ignore provider-specific frontmatter fields until validation shows a repeated gap.
+Codex adapters can load the canonical Claude role prompts and ignore provider-specific frontmatter fields until validation shows a repeated gap.
 
 ## Roles
 
@@ -112,8 +112,13 @@ Canonical prompt:
 
 ## Runner Notes
 
-Role behavior should stay stable across runners, but execution can differ:
+Role behavior is stable across runners, but execution can differ:
 
-- Claude Code may use native subagents.
-- Codex Phase 0 should use `codex exec` per role/task for isolation.
-- Future adapters may introduce runner-specific prompts only after validation evidence shows a need.
+- Claude Code can use native subagents.
+- Codex Phase 0 uses `codex exec` per role/task for isolation.
+- Future adapters can introduce runner-specific prompts only after validation evidence shows a need.
+
+Out of Phase 0 scope:
+
+- `md-reviewer`: meta prompt and markdown review helper invoked by reviewer when needed.
+- `test-engineer`: planning-time test strategy role used by `spec-plan`.

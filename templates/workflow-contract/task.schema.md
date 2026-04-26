@@ -4,7 +4,7 @@
 
 A task file is the self-contained work order for one implementation unit.
 
-Tasks should be feature-level, not file-level. They should be small enough for one implementer pass and one reviewer pass.
+Tasks are feature-level, not file-level. Keep each task small enough for one implementer pass and one reviewer pass.
 
 ## Filename
 
@@ -15,8 +15,8 @@ task-{N}-{kebab-name}.md
 Rules:
 
 - `N` is a 1-based task number.
-- `{kebab-name}` should be stable and descriptive.
-- Result filename should append `-result` before `.md`.
+- `{kebab-name}` must be stable and descriptive.
+- Result filename must append `-result` before `.md`.
 
 ## Required Sections
 
@@ -40,15 +40,15 @@ Rules:
 
 ### Context
 
-Summarize the relevant plan, prior decisions, and constraints. The implementer should not need prior conversation context.
+Summarize the relevant plan, prior decisions, and constraints. The implementer must not need prior conversation context.
 
 ### Goal
 
-Describe the behavior or outcome to implement.
+Define the behavior or outcome to implement.
 
 ### Inputs
 
-List files and artifacts the role should read.
+List files and artifacts to read.
 
 Example:
 
@@ -81,9 +81,9 @@ Example:
 
 Rules:
 
-- Every changed file in `diff.patch` should be listed here by some task.
+- Every changed file in `diff.patch` must be listed here by some task.
 - Use `none` when no paths are expected for a category.
-- Avoid broad globs unless the task genuinely owns a whole directory.
+- Do not use broad globs unless the task genuinely owns a whole directory.
 
 ### Reference Guidelines
 
@@ -105,7 +105,7 @@ Example:
 
 Rules:
 
-- Every promised command should appear in `test-output.log` or the task result.
+- Every promised command must appear in `test-output.log` or the task result.
 - If a checkbox is intentionally skipped, the result must explain why.
 
 ### On completion

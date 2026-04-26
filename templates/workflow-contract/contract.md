@@ -49,7 +49,7 @@ The `.claude/` runtime path is historical compatibility. It is not a Claude-only
 .claude/runs/{TICKET}/test-output.log
 ```
 
-Adapters may store provider-native logs elsewhere, but the auditor only relies on these shared artifacts during Phase 0.
+Adapters can store provider-native logs elsewhere, but the auditor only relies on these shared artifacts during Phase 0.
 
 ## Workflow Artifacts
 
@@ -101,7 +101,7 @@ See `result.schema.md`.
 
 `manifest.yaml` binds ticket-level runs, plan revisions, session identifiers, artifacts, and quality gate evidence.
 
-The integrator owns final manifest writing. A runner may create an initial stub, but the integrator finalizes status and gate evidence after all task results are available.
+The integrator owns final manifest writing. A runner can create an initial stub, but the integrator finalizes status and gate evidence after all task results are available.
 
 See `manifest.schema.md`.
 
@@ -109,7 +109,7 @@ See `manifest.schema.md`.
 
 `diff.patch` captures the final code changes for the run.
 
-For validation, it should be generated from the repository state used by the runner and stored under `.claude/runs/{TICKET}/`.
+For validation, generate it from the repository state used by the runner and store it under `.claude/runs/{TICKET}/`.
 
 ### Test Output
 
@@ -119,7 +119,7 @@ If multiple commands are run, append each command with enough context to connect
 
 ## Phase 0 Audit Contract
 
-The artifact-only auditor should check:
+The artifact-only auditor checks:
 
 1. Every task in the plan or task directory has a matching result file.
 2. Files changed in `diff.patch` are declared in task `## Outputs`.
@@ -128,7 +128,7 @@ The artifact-only auditor should check:
 5. Result files include runner, role, model, status, and timestamps.
 6. `spec-plan` runs stayed planning-only when a manifest records workflow `spec-plan`.
 
-Phase 0 audit output should be advisory until one Claude-native and one Codex validation run succeed.
+Treat Phase 0 audit output as advisory until one Claude-native and one Codex validation run succeed.
 
 ## Acceptance Criteria
 
