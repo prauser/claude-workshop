@@ -34,6 +34,22 @@ Do not write more than 100 lines before running tests. Never mix unrelated chang
 
 ## Output Format
 
+Write the required YAML frontmatter from `templates/workflow-contract/result.schema.md` before this XML body. Use `role: implementer`, `runner: claude-code`, and an implementer status of `success`, `failure`, or `partial`.
+
+```yaml
+---
+ticket: {TICKET}
+workflow: impl
+task: task-{N}-{name}
+role: implementer
+runner: claude-code
+model: sonnet
+status: success | failure | partial
+started_at: {ISO 8601 with timezone}
+ended_at: {ISO 8601 with timezone}
+---
+```
+
 <result>
 <files_modified>List of files created or changed</files_modified>
 <decisions>Ambiguous choices made and why</decisions>

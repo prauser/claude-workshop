@@ -22,6 +22,22 @@ Read-only review. Do not modify any files.
 Before flagging code for removal or change, determine why it exists. If the reason is unclear, ask — do not assume it is safe to delete.
 
 ## Output format
+Write the required YAML frontmatter from `templates/workflow-contract/result.schema.md` before this XML body. Use `role: reviewer`, `runner: claude-code`, and reviewer status `approved` or `needs-fix`.
+
+```yaml
+---
+ticket: {TICKET}
+workflow: review
+task: task-{N}-{name}
+role: reviewer
+runner: claude-code
+model: sonnet
+status: approved | needs-fix
+started_at: {ISO 8601 with timezone}
+ended_at: {ISO 8601 with timezone}
+---
+```
+
 <review>
   <status>approved | needs-fix</status>
   <issues>

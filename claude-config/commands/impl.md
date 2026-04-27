@@ -13,7 +13,11 @@ Orchestrate implementation via specialist agents. Never write code directly. Pul
    - **Free text**: use as initial context for spec discussion.
    - **No argument**: ask user what to implement.
 2. **Spec discussion** (when no plan.md): elicit requirements, summarize as bullets, confirm.
-3. Record ticket if applicable: `echo "{TICKET}" > .claude/current-ticket`
+3. Record ticket if applicable: `echo "{TICKET}" > .claude/current-ticket`. If no external ticket exists, after confirmation assign `LOCAL-{YYYYMMDD-HHMMSS}` and record it the same way.
+4. Ensure `.claude/runs/{TICKET}/` exists. Agents write all run artifacts there:
+   - `diff.patch` — final run diff for validation
+   - `test-output.log` — command and quality gate evidence
+   - `manifest.yaml` — final run manifest written by the integrator
 
 ## On debug/analysis request
 1. **Classify** — debugging (bug/symptom) or analysis (understanding).
@@ -44,6 +48,17 @@ Orchestrate implementation via specialist agents. Never write code directly. Pul
    - [ ] {feature-specific checks}
    ## On completion
    Write `.claude/tasks/done/task-{N}-{name}-result.md`:
+   ---
+   ticket: {TICKET}
+   workflow: impl
+   task: task-{N}-{name}
+   role: implementer
+   runner: claude-code
+   model: sonnet
+   status: success | failure | partial
+   started_at: {ISO 8601 with timezone}
+   ended_at: {ISO 8601 with timezone}
+   ---
    <result>
      <status>success | failure</status>
      <files><file path="{path}">{description}</file></files>

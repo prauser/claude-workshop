@@ -24,7 +24,7 @@ Fields:
 
 - `ticket`: Ticket ID or synthetic validation ID.
 - `workflow`: `impl`, `review`, `integration`, or `validation`.
-- `task`: Task slug matching the task filename without `.md`.
+- `task`: Task slug matching the task filename without `.md`. For integrator results with no per-task slug, use `integration`.
 - `role`: `implementer`, `reviewer`, `integrator`, `debugger`, or `analyzer`.
 - `runner`: `claude-code`, `codex`, or another explicit adapter name.
 - `model`: Provider model name, or `mixed` if multiple models were used.
