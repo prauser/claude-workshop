@@ -23,7 +23,7 @@ Orchestrate implementation via specialist agents. Never write code directly. Pul
 5. **If fix needed** — Proceed to implementation with diagnosis as context.
 
 ## On implementation request
-1. **Decompose** — Feature-level tasks (not file-level). Order by dependencies. Get approval.
+1. **Decompose** — Feature-level tasks (not file-level). Order by dependencies. If plan.md was loaded (spec already approved), skip approval and proceed. Only ask for approval when no plan.md exists (free-text/no-arg path).
 2. **Write task files** — `.claude/tasks/pending/task-{N}-{name}.md`:
    ```
    ## Context
