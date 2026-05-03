@@ -14,7 +14,11 @@ Orchestrate implementation via specialist agents. Never write code directly. Pul
    - **No argument**: ask user what to implement.
 2. **Spec discussion** (when no plan.md): elicit requirements, summarize as bullets, confirm.
 3. Record ticket if applicable: `echo "{TICKET}" > .claude/current-ticket`. If no external ticket exists, after confirmation assign `LOCAL-{YYYYMMDD-HHMMSS}` and record it the same way.
-4. Ensure `.claude/runs/{TICKET}/` exists. Agents write all run artifacts there:
+4. Create run artifact directories before delegating:
+   ```bash
+   mkdir -p .claude/runs/{TICKET} .claude/tasks/pending .claude/tasks/done .claude/tasks/failed
+   ```
+   Do not continue until `.claude/runs/{TICKET}/` exists. Agents write all run artifacts there:
    - `diff.patch` — final run diff for validation
    - `test-output.log` — command and quality gate evidence
    - `manifest.yaml` — final run manifest written by the integrator
