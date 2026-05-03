@@ -214,7 +214,10 @@ Read:
 - Current diff: ${diff_path}
 - Result schema: templates/workflow-contract/result.schema.md
 
-Write your final review as markdown/XML in the final response. The runner stores it as a Codex sidecar.
+Write your reviewer result to:
+- .claude/tasks/done/$(task_slug "$task_path")-review.md
+
+Also summarize the review in your final response. The runner stores that response as a Codex sidecar.
 EOF
       ;;
     integrator)
@@ -233,6 +236,7 @@ Read:
 - Task directory: ${tasks_dir}
 - Done results: .claude/tasks/done/
 - Failed results: .claude/tasks/failed/
+- Codex sidecars: ${codex_dir}/
 - Current diff: ${diff_path}
 - Test output: ${test_output_path}
 - Manifest schema: templates/workflow-contract/manifest.schema.md
