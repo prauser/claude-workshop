@@ -27,6 +27,10 @@ shared artifacts: task results, `diff.patch`, `test-output.log`, and
 the manifest stub uses a stable local run id for `session_id`; provider thread
 ids remain in the JSONL sidecars.
 
+`diff.patch` is generated from tracked changes plus non-ignored untracked files
+using temporary `git add -N` intent-to-add entries. Start validation from a clean
+worktree so unrelated untracked files do not enter the patch.
+
 ## Usage
 
 Dry-run command planning:

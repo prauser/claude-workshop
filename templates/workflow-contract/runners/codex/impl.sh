@@ -120,7 +120,15 @@ codex_base_cmd() {
 refresh_diff() {
   mkdir -p "$runs_dir"
   if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    local intent_paths=()
+    while IFS= read -r -d '' path; do
+      intent_paths+=("$path")
+      git add -N -- "$path"
+    done < <(git ls-files --others --exclude-standard -z)
     git diff --binary > "$diff_path"
+    if [[ "${#intent_paths[@]}" -gt 0 ]]; then
+      git reset -- "${intent_paths[@]}" >/dev/null
+    fi
   else
     : > "$diff_path"
   fi

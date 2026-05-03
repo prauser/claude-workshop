@@ -129,3 +129,29 @@ Phase 0 contract goals are met for Claude-native. Codex exec validation is block
 | Validation report separates contract, quality, cost, latency | Present in this document |
 
 Phase 0 contract is **accepted for Claude-native**. Codex acceptance deferred until network access is available.
+
+## Codex Direct Rerun — 2026-05-03
+
+Ticket: `LOCAL-20260503-225201`
+
+Result: **Codex accepted for Phase 0 artifact contract.**
+
+The direct Codex runner completed all three role/process steps:
+
+- implementer wrote `experiments/workflow-improvement/fixtures/codex-direct-greet/hello.py`
+- implementer wrote `experiments/workflow-improvement/fixtures/codex-direct-greet/test_hello.py`
+- reviewer wrote `.claude/tasks/done/task-1-experiment-greet-review.md`
+- integrator finalized `.claude/runs/LOCAL-20260503-225201/manifest.yaml`
+- auditor exited 0 after `diff.patch` captured the new non-ignored files
+
+Additional runner finding:
+
+- `git diff` alone does not include untracked new files. The runner now uses temporary `git add -N` intent-to-add entries while generating `diff.patch`.
+
+Final Phase 0 status after rerun:
+
+```text
+Claude-native: accepted
+Codex exec-per-task: accepted
+Artifact-only auditor: shared pass on complete runs
+```
