@@ -1,0 +1,4 @@
+- [ ] Compile succeeds (Development Editor, zero errors)
+- [ ] Static Analysis passes (UnrealHeaderTool, no new warnings)
+- [ ] Automation Tests pass (smoke suite)
+- [ ] Cook succeeds (Win64, Development)

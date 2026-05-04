@@ -1,0 +1,3 @@
+- [ ] Build succeeds
+- [ ] Lint passes
+- [ ] Tests pass
