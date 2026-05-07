@@ -18,11 +18,45 @@ Orchestrate implementation via specialist agents. Never write code directly. Pul
 - 모든 result frontmatter 의 `status` 가 terminal (`success`/`partial`/`failure`) 인지 확인
 - `pending` / `in-progress` 가 남아 있으면 해당 result 를 `error` 로 강등하고 body 에
   `auto-demoted` 라인을 한 줄 추가
+- per-role 분리 시에도 검증은 result frontmatter 단위 — runner 가 다르더라도 모든 result 의
+  status 가 terminal 인지 동일 룰로 점검한다.
 
 headless runner 가 exit 3 (codex 실패 등) 으로 종료하면 **자동 in-session fallback 금지**.
 사용자에게 실패 출력을 보여주고 명시적 재실행 요청을 받는다 (예: `/impl --runner in-session`).
 
 Runner enum / Status machine 의 SSOT 는 `templates/workflow-contract/contract.md` 의 §Runners / §Status Machine.
+Per-role / preset 매핑의 SSOT 는 본 파일의 §Per-role runner override / §권장 프리셋. runner
+스크립트(`templates/workflow-contract/runners/`) 는 task 단위로만 호출되며, role-별 분리는
+orchestrator 가 결정.
+
+### Per-role runner override
+
+기본은 `--runner` 가 모든 role 에 적용되지만, role-별로 다른 runner 를 쓰고 싶으면:
+
+- `--runner-implementer ID` — implementer 에이전트만 다른 runner 로 실행
+- `--runner-reviewer ID` — reviewer 에이전트만 다른 runner 로 실행
+- `--runner-integrator ID` — integrator 에이전트만 다른 runner 로 실행
+
+각 플래그가 받을 수 있는 ID 는 `--runner` 와 동일 (`in-session` / `headless-claude` /
+`headless-codex`). 우선순위: per-role > `--runner` > 기본값(`in-session`).
+
+미지정 role 은 `--runner` 또는 기본값을 그대로 사용한다.
+
+### 권장 프리셋
+
+비용 / 품질 trade-off 가 명확한 두 프리셋을 명시 옵션으로 둔다. 기본값은 여전히 `in-session`
+일괄 — 사용자가 명시하지 않으면 프리셋 적용 X.
+
+| 프리셋 | implementer | reviewer | integrator | 적용 명령 |
+|---|---|---|---|---|
+| `--preset cost-optimized` | `headless-codex` | `in-session` | `in-session` | implementer 만 codex 로 cost 절감, 비판적 판단 (review/integration) 은 Claude in-session |
+| `--preset claude-only` | `in-session` | `in-session` | `in-session` | 기본값과 동일 — 명시적으로 프리셋 표기를 원할 때 |
+
+프리셋과 per-role 플래그가 동시에 주어지면 **per-role 플래그가 우선**, 프리셋은 그 외 role 에만
+적용. 두 프리셋이 동시 지정되면 에러 (인자 오류).
+
+cost / latency 측정은 `runs/{TICKET}/manifest.yaml` 의 model / runner 필드로 사후 비교 가능.
+실측 결과 수집은 별도 phase (plan.md §Intentional Exclusions 의 "cache 최적화" 항목 참조).
 
 ## On activation
 
