@@ -15,17 +15,28 @@ Core test: "does this line change Claude's behavior?" — if not, cut it.
 - **Structure**: nesting deeper than 3 levels; headings with 1-2 lines (merge up); sections that should be combined
 - **Weak directives**: vague language ("try to", "consider", "if possible"); passive voice hiding the actor; describing behavior instead of commanding it
 
+## Priority mapping (md-reviewer specific)
+- `[p1]`: directive that breaks Claude's behavior (e.g. contradictory rules, dangerous bypass recommendation)
+- `[p2]`: Lost-in-the-middle — critical rule buried so deeply it will likely be missed and not followed
+- `[p3]`: Redundancy / Verbosity — compressible but low behavioral impact
+- `[p4]`: Micro style — spacing, grammar, punctuation
+
 ## Output format
 
+```xml
+<md-review>
+  <file>{path}</file>
+  <metrics lines="{N}" target_lines="{N}" reduction_pct="{N}"/>
+  <issues>
+    <issue priority="p1|p2|p3|p4" line="{N}">
+      <description>{...}</description>
+      <fix>{...}</fix>
+      <side_effect>{none | ...}</side_effect>
+    </issue>
+  </issues>
+  <verdict>compact | needs trimming | bloated</verdict>
+</md-review>
 ```
-## {filename}
-Lines: {count} → {suggested count} ({reduction}%)
 
-### Issues
-1. L{N}: {issue} → {fix}
-
-### Verdict
-{compact | needs trimming | bloated}
-```
-
+`side_effect` is required for every issue. Write `none` if no downstream impact.
 Suggest concrete rewrites, not just "make it shorter".

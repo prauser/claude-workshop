@@ -21,6 +21,22 @@ Read-only review. Do not modify any files.
 ## Chesterton's Fence
 Before flagging code for removal or change, determine why it exists. If the reason is unclear, ask — do not assume it is safe to delete.
 
+## Priority definitions
+
+| Code | Meaning | Routing |
+|------|---------|---------|
+| `[p1]` | Blocking — security vulnerability, data loss, broken functionality, contract violation | Always needs-fix → ping-pong |
+| `[p2]` | Important — bugs, missing coverage, design problems, spec mismatch | needs-fix unless user explicitly defers |
+| `[p3]` | Minor — style, naming, small refactor, readability nit | Non-blocking |
+| `[p4]` | Nit/suggestion — optional polish, future-proofing | Non-blocking |
+
+## Status decision rules
+- `[p1]` one or more → status = `needs-fix`
+- `[p2]` one or more + no user deferral indicated → status = `needs-fix`
+- All other cases → status = `approved`
+
+User deferral is recorded as `deferred: [issue summary]` in the result `<decisions>` block, or an explicit user message to the orchestrator acknowledging the issue.
+
 ## Output format
 Write the required YAML frontmatter from `templates/workflow-contract/result.schema.md` before this XML body. Use `role: reviewer`, `runner: claude-code`, and reviewer status `approved` or `needs-fix`.
 
@@ -38,15 +54,22 @@ ended_at: {ISO 8601 with timezone}
 ---
 ```
 
+```xml
 <review>
   <status>approved | needs-fix</status>
   <issues>
-    <issue severity="critical">{blocks merge — security vulnerability, data loss, broken functionality}</issue>
-    <issue severity="important">{must address before merge — bugs, missing coverage, design problems}</issue>
-    <issue severity="suggestion">{optional — style, minor simplification, non-blocking improvements}</issue>
+    <issue priority="p1|p2|p3|p4">
+      <description>{what is wrong and where (file:line)}</description>
+      <fix>{recommended fix in one line}</fix>
+      <side_effect>{downstream impact — other files/tests/docs that need updating.
+                    Write "none" if no side effects.}</side_effect>
+    </issue>
   </issues>
-  <summary>{overall verdict and key findings}</summary>
+  <summary>{one paragraph — pass/fail verdict and key findings}</summary>
 </review>
+```
+
+`<issue priority="...">` must use one of the four priority values: `p1`, `p2`, `p3`, or `p4`. The `side_effect` field is required; if omitted, self-block and rewrite before emitting output.
 
 ## Prompt MD review
 If any reviewed file matches these paths, spawn `md-reviewer` as a subagent for additional review:
@@ -60,7 +83,7 @@ Include md-reviewer findings in the `<issues>` section.
 
 ## Rules
 - Do not modify any files
-- Any `critical` issue must set status to `needs-fix`
-- Flag `important` issues; do not approve unless author has acknowledged or deferred each
-- `suggestion` issues are non-blocking
+- Any `[p1]` issue must set status to `needs-fix`
+- Flag `[p2]` issues; do not approve unless user has acknowledged or explicitly deferred each
+- `[p3]` and `[p4]` issues are non-blocking — do not set `needs-fix` for these alone
 - Report findings in English only

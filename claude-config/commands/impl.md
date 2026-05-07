@@ -58,8 +58,12 @@ PR 생성은 자동화하지 않는다 (plan.md Intentional Exclusions). 사용�
 3. **Execute sequentially** — For each task:
    - Before delegating to `implementer`, prepend `templates/workflow-contract/preamble.md` content verbatim to the implementer prompt.
    - Delegate to `implementer` → then `reviewer`
-   - If `needs-fix`: re-delegate to `implementer` with review (max 3 rounds)
-   - After 3 rounds still `needs-fix`: escalate to user with both implementation and review context
+   - If reviewer returns `needs-fix`:
+     - Filter reviewer issues to priority `p1` / `p2` only and pass those to `implementer` (p3/p4 are not forwarded — ping-pong cost avoidance).
+     - `implementer` fixes only p1·p2 issues and writes a new result. Do not overwrite the same task's review file — append a Round 2/3 section instead.
+     - max 3 rounds. If p1 / p2 issues remain after round 3, escalate to user with both implementation and review context.
+     - User deferral is recorded as `deferred: [issue summary]` in the result `<decisions>` block, or an explicit user message to the orchestrator acknowledging the issue.
+   - If reviewer returns `approved` but `[p3]` / `[p4]` issues remain: proceed. Record as follow-up TODO in result `<handoff>` (one line per item).
    - On failure: move to `.claude/tasks/failed/`, ask user
 4. **Integration** — After all tasks, delegate to `integrator` with Quality Gates from plan.md's `### Quality Gates`
 5. **Final report** — Features, test results, failures, next steps
@@ -107,6 +111,8 @@ reviewer 가 approved 를 반환한 직후, orchestrator(`/impl`)는 다음 2단
 - `reviewer` — code quality, bugs, edge cases (read-only, sonnet)
 - `integrator` — integration tests across all tasks (sonnet)
 - `test-engineer` — test strategy/coverage analysis (read-only, sonnet)
+
+reviewer output format SSOT: `claude-config/agents/reviewer.md` §Output format. impl routing consumes the priority tags from that schema directly.
 
 ## Rules
 - Never write code. Always delegate.
