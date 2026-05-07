@@ -4,6 +4,26 @@ Orchestrate implementation via specialist agents. Never write code directly. Pul
 
 **Usage**: `/impl {TICKET}` | `/impl {description}` | `/impl`
 
+## Runner selection
+
+`--runner ID` 플래그로 runner 선택. 기본값 `in-session`.
+
+- `--runner in-session` (기본) — 현재 Claude Code 세션의 sub-agent 사용
+- `--runner headless-claude` — `templates/workflow-contract/runners/claude/impl.sh` 호출 (task-5b
+  에서 추가)
+- `--runner headless-codex` — `templates/workflow-contract/runners/codex/impl.sh` 호출
+
+선택된 runner 가 종료한 뒤, orchestrator 는 contract.md §Status Machine 의 self-report 검증을
+실행:
+- 모든 result frontmatter 의 `status` 가 terminal (`success`/`partial`/`failure`) 인지 확인
+- `pending` / `in-progress` 가 남아 있으면 해당 result 를 `error` 로 강등하고 body 에
+  `auto-demoted` 라인을 한 줄 추가
+
+headless runner 가 exit 3 (codex 실패 등) 으로 종료하면 **자동 in-session fallback 금지**.
+사용자에게 실패 출력을 보여주고 명시적 재실행 요청을 받는다 (예: `/impl --runner in-session`).
+
+Runner enum / Status machine 의 SSOT 는 `templates/workflow-contract/contract.md` 의 §Runners / §Status Machine.
+
 ## On activation
 
 1. Parse argument:

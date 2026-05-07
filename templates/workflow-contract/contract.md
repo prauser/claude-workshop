@@ -127,6 +127,72 @@ prompt 앞에 직접 합치고, headless 러너는 task 파일 본문을 stdin/a
 프리앰블 본문은 `templates/workflow-contract/preamble.md`에 SSOT로 보관 (본 task에서 신규
 파일로 생성).
 
+## Runners
+
+`/impl` 가 task 를 실행할 때 사용하는 runner adapter 는 **3종**이며, 모두 같은 artifact 계약을
+지킨다 (plan.md / task / result / runs/{TICKET}/{diff.patch,test-output.log,manifest.yaml}).
+
+| ID | 설명 | 스크립트 위치 | 기본 model |
+|---|---|---|---|
+| `in-session` | 현재 Claude Code 세션의 sub-agent 호출. 기본값 | (스크립트 없음 — orchestrator 직접) | sonnet |
+| `headless-claude` | `claude -p --output-format json` exec 1회/role | `templates/workflow-contract/runners/claude/impl.sh` (task-5b 에서 신규) | sonnet |
+| `headless-codex` | `codex exec --json` exec 1회/role | `templates/workflow-contract/runners/codex/impl.sh` | (CLI 기본) |
+
+### Runner 호출 인터페이스
+
+각 runner script (in-session 제외) 는 다음 CLI 표준을 만족:
+
+```text
+impl.sh --ticket TICKET [--plan PATH] [--tasks-dir PATH] [--model MODEL] [--dry-run]
+```
+
+종료 코드:
+- `0` — 모든 task 의 result 가 terminal status (`success`/`failure`/`partial`) 로 기록됨
+- `2` — 인자 오류
+- `3` — runner-specific 실패 (CLI 미설치 / network / auth). **fallback 금지** — 사용자가 in-session
+  으로 재시도하도록 안내 (운영 사고 방지)
+- `1` — 기타 / 알 수 없는 실패
+
+### Codex 실패 정책 (fail-loud)
+
+`codex` CLI 호출이 network / auth / sandbox / model-not-found 로 실패하면 (fail) runner 는:
+1. stderr 에 사람 읽을 수 있는 에러 출력
+2. 부분 결과를 `.claude/tasks/failed/` 로 이동
+3. exit 3 으로 종료
+
+`--silent` / `--ignore-error` / 자동 in-session fallback 을 도입하지 않는다 (조용한 fallback 은
+사용자가 알아채지 못하는 운영 사고의 가장 흔한 원인). fallback 금지는 no automatic fallback 정책의
+핵심 불변 규칙이다.
+
+## Status Machine
+
+result 의 `status` 필드는 다음 상태 머신을 따른다.
+
+```text
+pending → in-progress → success | failure | partial
+                     ↘ (runner 종료 시 in-progress / pending 잔류) → error
+```
+
+| 상태 | 의미 | 누가 set |
+|---|---|---|
+| `pending` | task file 만 있고 runner 아직 시작 전 | (set 안 함 — 결과 파일 없음) |
+| `in-progress` | runner 가 시작했으나 아직 종료 안 됨 | runner 시작 시 result frontmatter 에 stub 작성 (선택) |
+| `success` | 의도한 결과 + 모든 AC 통과 | implementer/integrator |
+| `partial` | 일부 AC 만 통과, 나머지는 follow-up | implementer/integrator |
+| `failure` | AC 실패 또는 작업 중단 | implementer/integrator |
+| `error` | runner / 환경 / 자기보고 누락 — **자동 강등** | runner 또는 orchestrator |
+
+### Self-report 검증
+
+runner 종료 후 orchestrator (또는 in-session `/impl`) 는 모든 task 의 result frontmatter status
+를 점검:
+- `pending` 또는 `in-progress` 가 남아 있으면 → **자동 `error` 강등** (auto-demote: frontmatter
+  status 를 `error` 로 덮어쓰고 body 끝에 한 줄: `> auto-demoted: status was {original} at runner exit`)
+- terminal status (`success` / `partial` / `failure`) 만 audit pass.
+
+reviewer 의 status (`approved` / `needs-fix`) 는 별도 enum — 본 머신은 implementer / integrator /
+debugger / analyzer 의 status 에만 적용.
+
 ## Phase 0 Audit Contract
 
 The artifact-only auditor checks:

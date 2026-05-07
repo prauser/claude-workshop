@@ -26,11 +26,16 @@ Fields:
 - `workflow`: `impl`, `review`, `integration`, or `validation`.
 - `task`: Task slug matching the task filename without `.md`. For integrator results with no per-task slug, use `integration`.
 - `role`: `implementer`, `reviewer`, `integrator`, `debugger`, or `analyzer`.
-- `runner`: `claude-code`, `codex`, or another explicit adapter name.
+- `runner`: One of `in-session`, `headless-claude`, `headless-codex`, or `claude-code`/`codex`
+  for legacy compatibility. Auditors must accept either form during transition. (`claude-code` 는
+  과거 in-session 용 별칭; 신규 result 는 `in-session` 권장.)
 - `model`: Provider model name, or `mixed` if multiple models were used.
 - `status`: Role-specific outcome status.
-  - `implementer`, `integrator`, `debugger`, `analyzer`: `success`, `failure`, or `partial`.
-  - `reviewer`: `approved` or `needs-fix`.
+  - `implementer`, `integrator`, `debugger`, `analyzer`: one of `success`, `partial`, `failure`,
+    `error`, `in-progress`. Terminal values are the first three. `in-progress` is a transient
+    stub written when a runner starts; orchestrator demotes it to `error` if still present at
+    runner exit (see contract.md §Status Machine).
+  - `reviewer`: `approved` or `needs-fix` (independent enum).
 - `started_at`: ISO 8601 timestamp.
 - `ended_at`: ISO 8601 timestamp.
 
@@ -173,6 +178,44 @@ success
 Ready for reviewer.
 ```
 
+## Minimal In-session Example
+
+```markdown
+---
+ticket: OVDR-1234
+workflow: impl
+task: task-2-auth-guard
+role: implementer
+runner: in-session
+model: sonnet
+status: success
+started_at: 2026-04-27T11:00:00+09:00
+ended_at: 2026-04-27T11:15:00+09:00
+---
+
+## Status
+
+success
+
+## Files Changed
+
+- `src/auth.ts`: added guard middleware for protected routes.
+
+## Tests
+
+- Command: `npm test -- auth`
+- Status: pass
+- Evidence: `.claude/runs/OVDR-1234/test-output.log`
+
+## Decisions
+
+- none
+
+## Handoff
+
+Ready for reviewer.
+```
+
 ## Audit Notes
 
 The artifact-only auditor must be able to read:
@@ -182,3 +225,6 @@ The artifact-only auditor must be able to read:
 - test commands and evidence from `## Tests` or XML test fields
 - scope evidence from reviewer `## Scope Check` or `<review>` issues
 - gate evidence from integrator `## Quality Gates` or `<integration-result><gates>`
+
+> Auditor must demote any `pending` / `in-progress` status to `error` if observed in a finalized
+> manifest (per contract.md §Status Machine).
