@@ -33,45 +33,15 @@ Orchestrate implementation via specialist agents. Never write code directly. Pul
 ## On implementation request
 1. **Decompose** — Feature-level tasks (not file-level). Order by dependencies. If plan.md was loaded (spec already approved), skip approval and proceed. Only ask for approval when no plan.md exists (free-text/no-arg path).
 2. **Write task files** — `.claude/tasks/pending/task-{N}-{name}.md`:
-   ```
-   ## Context
-   {spec summary, self-contained}
-   ## Goal
-   {what to implement}
-   ## Inputs
-   - Ref files: {paths}
-   - Prior task results: {.claude/tasks/done/ paths if any}
-   ## Outputs
-   - Create: {paths}
-   - Modify: {paths}
-   ## Reference Guidelines
-   - {paths from CLAUDE.md guidelines: list, if configured}
-   ## Verification
-   - [ ] Write tests ({path})
-   - [ ] All tests pass
-   - [ ] {feature-specific checks}
-   ## On completion
-   Write `.claude/tasks/done/task-{N}-{name}-result.md`:
-   ---
-   ticket: {TICKET}
-   workflow: impl
-   task: task-{N}-{name}
-   role: implementer
-   runner: claude-code
-   model: sonnet
-   status: success | failure | partial
-   started_at: {ISO 8601 with timezone}
-   ended_at: {ISO 8601 with timezone}
-   ---
-   <result>
-     <status>success | failure</status>
-     <files><file path="{path}">{description}</file></files>
-     <tests passed="{N}" failed="{N}"><failure>{name}</failure></tests>
-     <decisions>{decisions made}</decisions>
-     <handoff>{for next task}</handoff>
-   </result>
-   ```
+   - Task format follows `templates/workflow-contract/task.schema.md` exactly.
+   - Five required elements:
+     1. **자기완결성**: implementer가 이전 대화 없이 독립 실행 가능해야 함.
+     2. **사용자 원문 복사**: `plan.md` 최상단 YAML frontmatter의 `user_prompt` 값을 task 파일 §"사용자 최초 프롬프트 원문" 블록에 그대로 복사. 요약·정제 금지.
+     3. **AC = 실행 가능 bash**: §Acceptance Criteria는 zero exit = pass인 bash 커맨드로만 작성. 추상적 서술 금지.
+     4. **주의사항 X-Y 형식**: "X 하지 마라. 이유: Y" 형식. 이유 누락 시 무효.
+     5. **On completion**: result 파일 경로와 result.schema.md 링크 명시.
 3. **Execute sequentially** — For each task:
+   - Before delegating to `implementer`, prepend `templates/workflow-contract/preamble.md` content verbatim to the implementer prompt.
    - Delegate to `implementer` → then `reviewer`
    - If `needs-fix`: re-delegate to `implementer` with review (max 3 rounds)
    - After 3 rounds still `needs-fix`: escalate to user with both implementation and review context

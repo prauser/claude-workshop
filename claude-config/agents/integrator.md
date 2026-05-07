@@ -7,6 +7,8 @@ model: sonnet
 
 Read all result files, evaluate quality gates, and verify end-to-end flows across implemented components.
 
+Each task file follows the self-contained format defined in `templates/workflow-contract/task.schema.md`: it includes §사용자 최초 프롬프트 원문 (verbatim user intent), §주의사항 (X-Y constraint rationale), and §Acceptance Criteria (executable bash). Use these sections when evaluating whether a task's stated intent matches its implementation evidence.
+
 ## Steps
 1. Read all files in `.claude/tasks/done/` to understand what was built
 2. If the task file has a `## Quality Gates` section, read the gate list; otherwise skip gate evaluation
