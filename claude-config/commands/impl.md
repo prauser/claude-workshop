@@ -23,6 +23,21 @@ Orchestrate implementation via specialist agents. Never write code directly. Pul
    - `test-output.log` — command and quality gate evidence
    - `manifest.yaml` — final run manifest written by the integrator
 
+## Branch policy
+
+`/impl` 진입 시 현재 브랜치를 확인한다.
+
+- 현재 브랜치가 `master` / `main` / `develop` 중 하나면, **자동으로 작업 브랜치를 분기**:
+  ```bash
+  SLUG="{plan.md 제목에서 추출한 kebab-slug, 최대 32자}"
+  git checkout -b "feat/{TICKET}-${SLUG}"
+  ```
+  분기 직전에 `git status`가 clean 이 아니면 사용자에게 멈추고 묻는다 (uncommitted 변경 보호).
+- 현재 브랜치가 이미 `feat/{TICKET}-*` 또는 사용자가 명시 지정한 브랜치면 **그대로 사용** (resume 시나리오).
+- 기타 브랜치(예: 다른 feat 브랜치 위) 면 사용자에게 한 번 확인하고 진행 여부 결정.
+
+PR 생성은 자동화하지 않는다 (plan.md Intentional Exclusions). 사용자가 수동으로 만든다.
+
 ## On debug/analysis request
 1. **Classify** — debugging (bug/symptom) or analysis (understanding).
 2. **Write task file** — `.claude/tasks/pending/task-{N}-{name}.md`
@@ -49,9 +64,41 @@ Orchestrate implementation via specialist agents. Never write code directly. Pul
 4. **Integration** — After all tasks, delegate to `integrator` with Quality Gates from plan.md's `### Quality Gates`
 5. **Final report** — Features, test results, failures, next steps
 
+## Commit policy
+
+reviewer 가 approved 를 반환한 직후, orchestrator(`/impl`)는 다음 2단 커밋을 순서대로 수행한다.
+이 commit 들은 preamble 규칙 7과 충돌하지 않는다 — 7번은 implementer 에이전트의 자동 commit 을
+금지할 뿐, orchestrator 의 통제된 commit 은 허용된다.
+
+1. **Code commit (`feat` / `fix` / `refactor` / `docs` 중 변경 성격에 맞는 type)**:
+   ```bash
+   git add {task.outputs 에 명시된 코드/문서 경로}
+   git commit -m "{type}({scope}): {task 한 줄 요약}
+
+   Refs: .claude/plans/{TICKET}/plan.md task-{N}"
+   ```
+   `git add` 는 **task `## Outputs` 에 선언된 경로만** 사용.
+   와일드카드 전체 추가(`-A` 플래그 또는 현재 디렉토리 `.` 인수) 금지
+   (선언되지 않은 secret/대용량 파일 보호).
+
+2. **Artifact commit (`chore`)**:
+   ```bash
+   ARTIFACT_TASK=".claude/tasks/done/task-{N}-*.md"
+   ARTIFACT_RUN=".claude/runs/{TICKET}/"
+   git add "${ARTIFACT_TASK}" "${ARTIFACT_RUN}"
+   git commit -m "chore({TICKET}): task-{N} artifacts"
+   ```
+   .claude/ 가 .gitignore 에 의해 무시되는 레포라면 이 단계는 스킵하고 result 파일에
+   `<decisions>` 한 줄로 기록한다.
+
+자동 push 는 하지 않는다. 자동 PR 도 만들지 않는다 (Intentional Exclusions).
+실패 시(예: pre-commit hook 거부) 양쪽 commit 모두 롤백하지 말고 — 첫 commit 은 유지하고
+두 번째 실패만 사용자에게 보고. 절대 `--no-verify` 로 hook 우회 금지.
+
 ## On completion
 1. `rm .claude/current-ticket`
 2. If `log_repo` is configured in CLAUDE.md, remind user to run `sync-logs.sh {TICKET}`.
+3. 모든 task 완료 후, 사용자에게 작업 브랜치 이름과 push 명령(`git push -u origin feat/...`)을 안내. push / PR 생성은 사용자가 수동.
 
 ## Agents
 - `debugger` — 6-step triage protocol (read-only, opus)
@@ -64,3 +111,4 @@ Orchestrate implementation via specialist agents. Never write code directly. Pul
 ## Rules
 - Never write code. Always delegate.
 - If spec changes, update affected pending task files.
+- Branch / commit / push 정책의 SSOT 는 이 파일의 §Branch policy / §Commit policy. preamble.md 7번과 정합.
