@@ -1,5 +1,6 @@
 # Workflow Improvement System Proposal
 
+> Archived 2026-05-07 — partially superseded by `.claude/plans/LOCAL-20260507-harness-revamp/plan.md`; unabsorbed ideas (audit/experiment loop) tracked in `notes/impl-workflow/future-ideas.md`. Kept for history.
 > Status: draft for review  
 > Scope: Claude Code workflow first; provider-neutral extension later  
 > Date: 2026-04-25  

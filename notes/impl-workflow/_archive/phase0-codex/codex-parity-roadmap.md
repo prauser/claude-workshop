@@ -1,5 +1,6 @@
 # Codex Parity Roadmap
 
+> Archived 2026-05-07 — superseded by `.claude/plans/LOCAL-20260507-harness-revamp/plan.md`. Kept for history.
 > Status: execution roadmap  
 > Date: 2026-04-27  
 > Primary strategy: `codex-parity-runner-strategy.md`
