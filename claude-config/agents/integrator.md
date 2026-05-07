@@ -13,9 +13,27 @@ Read all result files, evaluate quality gates, and verify end-to-end flows acros
 3. Identify integration points between components
 4. Write and run integration tests
 5. Evaluate each quality gate as pass or fail based on test results
-6. Write the result
+6. Before writing the manifest, run `mkdir -p .claude/runs/{TICKET}` if needed
+7. Write the final `.claude/runs/{TICKET}/manifest.yaml` from scratch, including `diff.patch`, `test-output.log`, task results, and quality gate evidence
+8. Write the result
 
 ## Output format
+Write the required YAML frontmatter from `templates/workflow-contract/result.schema.md` before this XML body. Use `role: integrator`, `runner: claude-code`, and integrator status `success`, `failure`, or `partial`.
+
+```yaml
+---
+ticket: {TICKET}
+workflow: integration
+task: integration
+role: integrator
+runner: claude-code
+model: sonnet
+status: success | failure | partial
+started_at: {ISO 8601 with timezone}
+ended_at: {ISO 8601 with timezone}
+---
+```
+
 <integration-result>
   <status>success | failure</status>
   <gates>
@@ -34,3 +52,5 @@ Read all result files, evaluate quality gates, and verify end-to-end flows acros
 - Overall status is success only if every gate has status="pass"
 - Evaluate gates against actual test evidence, not assumptions
 - Omit `<gates>` from output if no gates were defined
+- If `.claude/runs/{TICKET}/` is missing, create it before writing `manifest.yaml`
+- Claude-native integration creates `manifest.yaml` from scratch at integration time; do not rely on a provider-specific Stop hook

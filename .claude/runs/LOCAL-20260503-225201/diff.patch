@@ -1,0 +1,30 @@
+diff --git a/experiments/workflow-improvement/fixtures/codex-direct-greet/hello.py b/experiments/workflow-improvement/fixtures/codex-direct-greet/hello.py
+new file mode 100644
+index 0000000..18d0fe2
+--- /dev/null
++++ b/experiments/workflow-improvement/fixtures/codex-direct-greet/hello.py
+@@ -0,0 +1,6 @@
++def greet(name: str) -> str:
++    return f"Hello, {name}!"
++
++
++if __name__ == "__main__":
++    print(greet("World"))
+diff --git a/experiments/workflow-improvement/fixtures/codex-direct-greet/test_hello.py b/experiments/workflow-improvement/fixtures/codex-direct-greet/test_hello.py
+new file mode 100644
+index 0000000..f3522be
+--- /dev/null
++++ b/experiments/workflow-improvement/fixtures/codex-direct-greet/test_hello.py
+@@ -0,0 +1,12 @@
++import unittest
++
++from hello import greet
++
++
++class GreetTest(unittest.TestCase):
++    def test_greet_returns_expected_message(self):
++        self.assertEqual(greet("Codex"), "Hello, Codex!")
++
++
++if __name__ == "__main__":
++    unittest.main()
