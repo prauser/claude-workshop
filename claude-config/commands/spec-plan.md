@@ -29,8 +29,14 @@ Spawn 5 read-only subagents in parallel:
 - If fails: ask user to paste ticket details
 
 **[Spec Agent]** (sonnet) — skip if no config
-- Search `prd_path`, `specs_path`, `policies_path` using iterative search protocol
-- Return: requirements, priorities (P0/P1), open questions
+
+- If `docs_path` is set in CLAUDE.md `## Implementation Config` AND `${docs_path}/adr.yaml` or
+  `${docs_path}/conventions.yaml` exists: read those yaml files. Filter entries by `stacks:` tag
+  matching ticket keywords. Cite each surfaced item by its `id` (e.g., `ADR-014`, `CONV-007`).
+- Else (yaml absent): fall back to **plain-text search** of `prd_path`, `specs_path`,
+  `policies_path` using the iterative search protocol (existing behavior). No regression.
+- Return: requirements, priorities (P0/P1), open questions, **and a list of cited doc IDs (or
+  none)**.
 
 **[Code Agent]** (opus)
 - Search codebase files matching ticket keywords using iterative search protocol
@@ -170,6 +176,7 @@ ticket: {TICKET}
 created_at: {ISO 8601 with timezone}
 user_prompt: |
   {사용자가 /spec-plan을 호출하며 입력한 최초 프롬프트 전문 — indent 보존. 요약·정제 금지.}
+docs_cited: [ADR-014, CONV-007]   # omit when no yaml docs present
 ---
 
 # Plan — {TICKET}: {feature name}
@@ -177,7 +184,8 @@ user_prompt: |
 ```
 
 3. `user_prompt` must be the verbatim original text captured in "On activation" step 3. Summarization or paraphrasing is forbidden.
-4. Note for `/impl`: when `/impl` issues task files from this plan, it must copy the same `user_prompt` value to the top of each task file's metadata. (Implementation of this copy behavior is handled in the task format update phase; this spec establishes the intent.)
+4. `docs_cited` field: omit entirely when yaml docs are absent (plain-text fallback mode); never emit an empty array. Only include when Spec Agent actually cited one or more doc IDs.
+5. Note for `/impl`: when `/impl` issues task files from this plan, it must copy the same `user_prompt` value to the top of each task file's metadata. (Implementation of this copy behavior is handled in the task format update phase; this spec establishes the intent.)
 5. Tell user: "Plan saved. Run `/impl {TICKET}` when ready."
 
 ## Error handling

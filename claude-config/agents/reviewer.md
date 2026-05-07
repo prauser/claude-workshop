@@ -63,6 +63,7 @@ ended_at: {ISO 8601 with timezone}
       <fix>{recommended fix in one line}</fix>
       <side_effect>{downstream impact — other files/tests/docs that need updating.
                     Write "none" if no side effects.}</side_effect>
+      <doc_ref>ADR-014, CONV-007</doc_ref>   <!-- optional; omit when no doc is cited -->
     </issue>
   </issues>
   <summary>{one paragraph — pass/fail verdict and key findings}</summary>
@@ -70,6 +71,8 @@ ended_at: {ISO 8601 with timezone}
 ```
 
 `<issue priority="...">` must use one of the four priority values: `p1`, `p2`, `p3`, or `p4`. The `side_effect` field is required; if omitted, self-block and rewrite before emitting output.
+
+If the project has `docs_path` configured and entries match the issue, cite IDs in `<doc_ref>`. Omit the tag entirely when no doc applies — never emit empty `<doc_ref/>`.
 
 ## Prompt MD review
 If any reviewed file matches these paths, spawn `md-reviewer` as a subagent for additional review:
