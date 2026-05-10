@@ -37,6 +37,8 @@ Before flagging code for removal or change, determine why it exists. If the reas
 
 User deferral is recorded as `deferred: [issue summary]` in the result `<decisions>` block, or an explicit user message to the orchestrator acknowledging the issue.
 
+Path resolution: `templates/workflow-contract/...` 인용 시 cwd 우선, 부재하면 `$HOME/.claude/templates/workflow-contract/...`. 정책 SSOT: `claude-config/commands/impl.md` §Template path resolution.
+
 ## Output format
 Write the required YAML frontmatter from `templates/workflow-contract/result.schema.md` before this XML body. Use `role: reviewer`, `runner: claude-code`, and reviewer status `approved` or `needs-fix`.
 

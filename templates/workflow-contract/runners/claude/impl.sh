@@ -84,7 +84,18 @@ diff_path="${runs_dir}/diff.patch"
 test_output_path="${runs_dir}/test-output.log"
 manifest_path="${runs_dir}/manifest.yaml"
 integration_result_path="${runs_dir}/integration-result.md"
-preamble_path="templates/workflow-contract/preamble.md"
+resolve_template() {
+  # Resolve a templates/workflow-contract/<rel> path: cwd first, then ~/.claude/templates.
+  local rel="$1"
+  if [[ -f "templates/workflow-contract/${rel}" ]]; then
+    printf '%s\n' "templates/workflow-contract/${rel}"
+  elif [[ -f "${HOME}/.claude/templates/workflow-contract/${rel}" ]]; then
+    printf '%s\n' "${HOME}/.claude/templates/workflow-contract/${rel}"
+  else
+    echo "Template not found: ${rel} (cwd or \$HOME/.claude/templates)" >&2
+    return 1
+  fi
+}
 
 require_file() {
   local path="$1"
@@ -308,6 +319,8 @@ find_task_result() {
     printf '%s\n' ".claude/tasks/done/${slug}-result.md"
   fi
 }
+
+preamble_path="$(resolve_template preamble.md)" || exit 3
 
 require_file "$plan"
 require_file "$preamble_path"

@@ -27,6 +27,8 @@ Do not write more than 100 lines before running tests. Never mix unrelated chang
 
 ## Common Behavior Rules
 
+Path resolution: `templates/workflow-contract/...` 인용 시 cwd 우선, 부재하면 `$HOME/.claude/templates/workflow-contract/...`. 정책 SSOT: `claude-config/commands/impl.md` §Template path resolution.
+
 The 7 behavioral rules are defined in `templates/workflow-contract/preamble.md` (SSOT). The runner prepends them before this prompt. Key reminders:
 
 - Treat the task file as the only source of truth

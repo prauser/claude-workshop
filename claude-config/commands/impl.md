@@ -4,6 +4,16 @@ Orchestrate implementation via specialist agents. Never write code directly. Pul
 
 **Usage**: `/impl {TICKET}` | `/impl {description}` | `/impl`
 
+## Template path resolution
+
+본 prompt 와 sub-agent 는 `templates/workflow-contract/...` 의 SSOT 파일을 인용한다.
+**resolution 규칙 (cwd 우선, `~/.claude/templates` 폴백)**:
+`./templates/workflow-contract/{file}` 가 존재하면 그것, 없으면
+`~/.claude/templates/workflow-contract/{file}` 를 사용. 둘 다 없으면 사용자에게
+"`./deploy.sh` 미실행 가능성" 경고 후 진행 중단.
+
+이 규칙은 in-session orchestrator / implementer / reviewer / integrator / 헤드리스 러너 모두 동일.
+
 ## Runner selection
 
 `--runner ID` 플래그로 runner 선택. 기본값 `in-session`.
