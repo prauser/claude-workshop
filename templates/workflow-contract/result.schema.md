@@ -49,6 +49,13 @@ Rules:
 
 Phase 0 keeps Claude-native workflow behavior unchanged. Existing canonical agents can continue to write XML bodies:
 
+> **Migration note (post task-6/11):** new reviewer results must use the `<review>` XML body
+> defined in `claude-config/agents/reviewer.md` §Output format. The markdown reviewer body
+> documented in §Recommended Reviewer Body below is **legacy** — kept so auditors can still
+> parse pre-task-6 result files, but no new reviewer output should use it. Implementer /
+> integrator body forms are unaffected and may continue to use either XML or the recommended
+> markdown form.
+
 - implementer: `<result>...</result>`
 - reviewer: `<review>...</review>`
 - integrator: `<integration-result>...</integration-result>`
@@ -83,7 +90,9 @@ success | failure | partial
 Notes for reviewer or next task, or `none`.
 ```
 
-## Recommended Reviewer Body
+## Recommended Reviewer Body — Legacy form — see Migration note above. Do not emit for new reviews.
+
+> Legacy form — see Migration note above. Do not emit for new reviews.
 
 ```markdown
 ## Status

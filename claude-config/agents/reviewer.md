@@ -42,6 +42,12 @@ Path resolution: `templates/workflow-contract/...` 인용 시 cwd 우선, 부재
 ## Output format
 Write the required YAML frontmatter from `templates/workflow-contract/result.schema.md` before this XML body. Use `role: reviewer`, `runner: claude-code`, and reviewer status `approved` or `needs-fix`.
 
+**Output body must be the `<review>` XML schema below. Do not emit the markdown body
+(`## Status / ## Findings / ...`) — that form is legacy and is kept in
+`templates/workflow-contract/result.schema.md` for backward compatibility with pre-task-6 results
+only. New reviews must use XML so the orchestrator can parse `priority` and `<side_effect>` for
+ping-pong routing.**
+
 ```yaml
 ---
 ticket: {TICKET}
@@ -92,3 +98,4 @@ Include md-reviewer findings in the `<issues>` section.
 - Flag `[p2]` issues; do not approve unless user has acknowledged or explicitly deferred each
 - `[p3]` and `[p4]` issues are non-blocking — do not set `needs-fix` for these alone
 - Report findings in English only
+- Output body format is XML (`<review>...</review>`). Markdown body is forbidden for new reviews.
