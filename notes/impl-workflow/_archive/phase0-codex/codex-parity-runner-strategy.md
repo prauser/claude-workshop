@@ -1,5 +1,6 @@
 # Codex Parity Runner Strategy
 
+> Archived 2026-05-07 — superseded by `.claude/plans/LOCAL-20260507-harness-revamp/plan.md` (Phase 5 runner abstraction). Kept for history.
 > Status: draft for review  
 > Scope: make `/spec-plan` and `/impl` workflow concepts portable to Codex without weakening the current Claude Code workflow  
 > Date: 2026-04-27  

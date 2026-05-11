@@ -8,7 +8,7 @@ model: sonnet
 Read the task file carefully. Implement the goal and write unit tests. No prior conversation context is available.
 
 ## Steps
-1. Read context, goal, inputs/outputs from the task file
+1. Read 사용자 최초 프롬프트 원문 / 사전 준비 / 작업 내용 / AC / 주의사항 from the task file
 2. Read referenced files to understand existing patterns and conventions
 3. Implement slice by slice: for each slice run the TDD cycle, then commit
 4. Write the result file
@@ -26,6 +26,11 @@ For each slice, repeat in order:
 Do not write more than 100 lines before running tests. Never mix unrelated changes in one commit.
 
 ## Common Behavior Rules
+
+Path resolution: `templates/workflow-contract/...` 인용 시 cwd 우선, 부재하면 `$HOME/.claude/templates/workflow-contract/...`. 정책 SSOT: `claude-config/commands/impl.md` §Template path resolution.
+
+The 7 behavioral rules are defined in `templates/workflow-contract/preamble.md` (SSOT). The runner prepends them before this prompt. Key reminders:
+
 - Treat the task file as the only source of truth
 - Touch only what the task requires — do not clean up adjacent code, add unrequested features, or refactor files outside task scope
 - Fix failing tests before finishing — do not skip or disable

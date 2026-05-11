@@ -1,0 +1,17 @@
+# Architecture Decision Records (opt-in).
+# When this file exists at .claude/docs/adr.yaml or docs/adr.yaml,
+# spec-plan's Spec Agent and reviewer will surface relevant entries by ID.
+schema_version: 0.1
+entries:
+  # - id: ADR-001
+  #   title: <decision title>
+  #   status: proposed | accepted | superseded | deprecated
+  #   date: 2026-05-07
+  #   stacks: [backend, frontend, infra]   # filter tags for sub-agents
+  #   context: |
+  #     <one paragraph>
+  #   decision: |
+  #     <one paragraph>
+  #   consequences: |
+  #     <one paragraph>
+  #   superseded_by: ADR-002   # optional

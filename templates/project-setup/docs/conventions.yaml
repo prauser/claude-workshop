@@ -1,0 +1,18 @@
+# Project conventions (opt-in).
+# When this file exists at .claude/docs/conventions.yaml or docs/conventions.yaml,
+# spec-plan and reviewer will cite relevant entries by ID.
+schema_version: 0.1
+entries:
+  # - id: CONV-001
+  #   topic: <e.g., error handling, naming, testing>
+  #   stacks: [backend]
+  #   rule: |
+  #     <one or two sentences — the actual rule>
+  #   rationale: |
+  #     <why — one short paragraph>
+  #   examples_good:
+  #     - |
+  #       <code or pattern>
+  #   examples_bad:
+  #     - |
+  #       <antipattern>

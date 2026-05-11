@@ -1,6 +1,6 @@
 #!/bin/bash
 # deploy.sh
-# Deploys claude-config (commands, agents) to ~/.claude/
+# Deploys claude-config (commands, agents) and templates to ~/.claude/
 # Run from claude-workshop/
 
 set -e
@@ -8,6 +8,8 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_DIR="$SCRIPT_DIR/claude-config"
 TARGET_DIR="$HOME/.claude"
+TEMPLATES_SOURCE_DIR="$SCRIPT_DIR/templates"
+TEMPLATES_TARGET_DIR="$HOME/.claude/templates"
 
 # Validate source
 if [ ! -d "$SOURCE_DIR" ]; then
@@ -33,7 +35,7 @@ for src in "$SOURCE_DIR/commands/"*.md "$SOURCE_DIR/agents/"*.md; do
   fi
 done
 
-# Check for files to remove
+# Check for files to remove in commands/agents
 for dir in commands agents; do
   [ -d "$TARGET_DIR/$dir" ] || continue
   for dst in "$TARGET_DIR/$dir/"*.md; do
@@ -45,6 +47,33 @@ for dir in commands agents; do
     fi
   done
 done
+
+# Show diff for templates/workflow-contract/
+if [ -d "$TEMPLATES_SOURCE_DIR/workflow-contract" ]; then
+  while IFS= read -r -d '' src; do
+    subpath="${src#$TEMPLATES_SOURCE_DIR/}"
+    dst="$TEMPLATES_TARGET_DIR/${subpath#workflow-contract/}"
+    dst_full="$TEMPLATES_TARGET_DIR/$subpath"
+    if [ -f "$dst_full" ] && ! diff -q "$src" "$dst_full" > /dev/null 2>&1; then
+      echo "  ~ templates/$subpath (changed)"
+      CHANGED=1
+    elif [ ! -f "$dst_full" ]; then
+      echo "  + templates/$subpath (new)"
+      CHANGED=1
+    fi
+  done < <(find "$TEMPLATES_SOURCE_DIR/workflow-contract" -type f -print0)
+
+  # Check for templates/workflow-contract orphans
+  if [ -d "$TEMPLATES_TARGET_DIR/workflow-contract" ]; then
+    while IFS= read -r -d '' dst; do
+      rel="${dst#$TEMPLATES_TARGET_DIR/workflow-contract/}"
+      if [ ! -f "$TEMPLATES_SOURCE_DIR/workflow-contract/$rel" ]; then
+        echo "  - templates/workflow-contract/$rel (will be removed)"
+        CHANGED=1
+      fi
+    done < <(find "$TEMPLATES_TARGET_DIR/workflow-contract" -type f -print0)
+  fi
+fi
 
 if [ "$CHANGED" -eq 0 ]; then
   echo "  Nothing to update."
@@ -58,13 +87,13 @@ if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
   exit 0
 fi
 
-# Deploy
+# Deploy commands and agents
 mkdir -p "$TARGET_DIR/commands" "$TARGET_DIR/agents"
 
 cp "$SOURCE_DIR/commands/"*.md "$TARGET_DIR/commands/" 2>/dev/null || true
 cp "$SOURCE_DIR/agents/"*.md "$TARGET_DIR/agents/" 2>/dev/null || true
 
-# Clean up: remove deployed files that no longer exist in source
+# Clean up: remove deployed commands/agents that no longer exist in source
 REMOVED=0
 for dir in commands agents; do
   [ -d "$TARGET_DIR/$dir" ] || continue
@@ -78,6 +107,26 @@ for dir in commands agents; do
     fi
   done
 done
+
+# Deploy templates/workflow-contract/
+if [ -d "$TEMPLATES_SOURCE_DIR/workflow-contract" ]; then
+  mkdir -p "$TEMPLATES_TARGET_DIR/workflow-contract"
+  # Copy entire workflow-contract tree preserving permissions (+x on shell scripts)
+  cp -rp "$TEMPLATES_SOURCE_DIR/workflow-contract/." "$TEMPLATES_TARGET_DIR/workflow-contract/"
+
+  # Ensure runner scripts are executable
+  find "$TEMPLATES_TARGET_DIR/workflow-contract/runners" -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
+
+  # Orphan cleanup: remove target files not present in source
+  while IFS= read -r -d '' dst; do
+    rel="${dst#$TEMPLATES_TARGET_DIR/workflow-contract/}"
+    if [ ! -f "$TEMPLATES_SOURCE_DIR/workflow-contract/$rel" ]; then
+      echo "  - templates/workflow-contract/$rel (removed)"
+      rm "$dst"
+      REMOVED=1
+    fi
+  done < <(find "$TEMPLATES_TARGET_DIR/workflow-contract" -type f -print0)
+fi
 
 echo ""
 echo "Done."

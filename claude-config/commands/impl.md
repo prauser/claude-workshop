@@ -4,6 +4,70 @@ Orchestrate implementation via specialist agents. Never write code directly. Pul
 
 **Usage**: `/impl {TICKET}` | `/impl {description}` | `/impl`
 
+## Template path resolution
+
+본 prompt 와 sub-agent 는 `templates/workflow-contract/...` 의 SSOT 파일을 인용한다.
+**resolution 규칙 (cwd 우선, `~/.claude/templates` 폴백)**:
+`./templates/workflow-contract/{file}` 가 존재하면 그것, 없으면
+`~/.claude/templates/workflow-contract/{file}` 를 사용. 둘 다 없으면 사용자에게
+"`./deploy.sh` 미실행 가능성" 경고 후 진행 중단.
+
+이 규칙은 in-session orchestrator / implementer / reviewer / integrator / 헤드리스 러너 모두 동일.
+
+## Runner selection
+
+`--runner ID` 플래그로 runner 선택. 기본값 `in-session`.
+
+- `--runner in-session` (기본) — 현재 Claude Code 세션의 sub-agent 사용
+- `--runner headless-claude` — `templates/workflow-contract/runners/claude/impl.sh` 호출 (task-5b
+  에서 추가)
+- `--runner headless-codex` — `templates/workflow-contract/runners/codex/impl.sh` 호출
+
+선택된 runner 가 종료한 뒤, orchestrator 는 contract.md §Status Machine 의 self-report 검증을
+실행:
+- 모든 result frontmatter 의 `status` 가 terminal (`success`/`partial`/`failure`) 인지 확인
+- `pending` / `in-progress` 가 남아 있으면 해당 result 를 `error` 로 강등하고 body 에
+  `auto-demoted` 라인을 한 줄 추가
+- per-role 분리 시에도 검증은 result frontmatter 단위 — runner 가 다르더라도 모든 result 의
+  status 가 terminal 인지 동일 룰로 점검한다.
+
+headless runner 가 exit 3 (codex 실패 등) 으로 종료하면 **자동 in-session fallback 금지**.
+사용자에게 실패 출력을 보여주고 명시적 재실행 요청을 받는다 (예: `/impl --runner in-session`).
+
+Runner enum / Status machine 의 SSOT 는 `templates/workflow-contract/contract.md` 의 §Runners / §Status Machine.
+Per-role / preset 매핑의 SSOT 는 본 파일의 §Per-role runner override / §권장 프리셋. runner
+스크립트(`templates/workflow-contract/runners/`) 는 task 단위로만 호출되며, role-별 분리는
+orchestrator 가 결정.
+
+### Per-role runner override
+
+기본은 `--runner` 가 모든 role 에 적용되지만, role-별로 다른 runner 를 쓰고 싶으면:
+
+- `--runner-implementer ID` — implementer 에이전트만 다른 runner 로 실행
+- `--runner-reviewer ID` — reviewer 에이전트만 다른 runner 로 실행
+- `--runner-integrator ID` — integrator 에이전트만 다른 runner 로 실행
+
+각 플래그가 받을 수 있는 ID 는 `--runner` 와 동일 (`in-session` / `headless-claude` /
+`headless-codex`). 우선순위: per-role > `--runner` > 기본값(`in-session`).
+
+미지정 role 은 `--runner` 또는 기본값을 그대로 사용한다.
+
+### 권장 프리셋
+
+비용 / 품질 trade-off 가 명확한 두 프리셋을 명시 옵션으로 둔다. 기본값은 여전히 `in-session`
+일괄 — 사용자가 명시하지 않으면 프리셋 적용 X.
+
+| 프리셋 | implementer | reviewer | integrator | 적용 명령 |
+|---|---|---|---|---|
+| `--preset cost-optimized` | `headless-codex` | `in-session` | `in-session` | implementer 만 codex 로 cost 절감, 비판적 판단 (review/integration) 은 Claude in-session |
+| `--preset claude-only` | `in-session` | `in-session` | `in-session` | 기본값과 동일 — 명시적으로 프리셋 표기를 원할 때 |
+
+프리셋과 per-role 플래그가 동시에 주어지면 **per-role 플래그가 우선**, 프리셋은 그 외 role 에만
+적용. 두 프리셋이 동시 지정되면 에러 (인자 오류).
+
+cost / latency 측정은 `runs/{TICKET}/manifest.yaml` 의 model / runner 필드로 사후 비교 가능.
+실측 결과 수집은 별도 phase (plan.md §Intentional Exclusions 의 "cache 최적화" 항목 참조).
+
 ## On activation
 
 1. Parse argument:
@@ -23,6 +87,21 @@ Orchestrate implementation via specialist agents. Never write code directly. Pul
    - `test-output.log` — command and quality gate evidence
    - `manifest.yaml` — final run manifest written by the integrator
 
+## Branch policy
+
+`/impl` 진입 시 현재 브랜치를 확인한다.
+
+- 현재 브랜치가 `master` / `main` / `develop` 중 하나면, **자동으로 작업 브랜치를 분기**:
+  ```bash
+  SLUG="{plan.md 제목에서 추출한 kebab-slug, 최대 32자}"
+  git checkout -b "feat/{TICKET}-${SLUG}"
+  ```
+  분기 직전에 `git status`가 clean 이 아니면 사용자에게 멈추고 묻는다 (uncommitted 변경 보호).
+- 현재 브랜치가 이미 `feat/{TICKET}-*` 또는 사용자가 명시 지정한 브랜치면 **그대로 사용** (resume 시나리오).
+- 기타 브랜치(예: 다른 feat 브랜치 위) 면 사용자에게 한 번 확인하고 진행 여부 결정.
+
+PR 생성은 자동화하지 않는다 (plan.md Intentional Exclusions). 사용자가 수동으로 만든다.
+
 ## On debug/analysis request
 1. **Classify** — debugging (bug/symptom) or analysis (understanding).
 2. **Write task file** — `.claude/tasks/pending/task-{N}-{name}.md`
@@ -33,55 +112,61 @@ Orchestrate implementation via specialist agents. Never write code directly. Pul
 ## On implementation request
 1. **Decompose** — Feature-level tasks (not file-level). Order by dependencies. If plan.md was loaded (spec already approved), skip approval and proceed. Only ask for approval when no plan.md exists (free-text/no-arg path).
 2. **Write task files** — `.claude/tasks/pending/task-{N}-{name}.md`:
-   ```
-   ## Context
-   {spec summary, self-contained}
-   ## Goal
-   {what to implement}
-   ## Inputs
-   - Ref files: {paths}
-   - Prior task results: {.claude/tasks/done/ paths if any}
-   ## Outputs
-   - Create: {paths}
-   - Modify: {paths}
-   ## Reference Guidelines
-   - {paths from CLAUDE.md guidelines: list, if configured}
-   ## Verification
-   - [ ] Write tests ({path})
-   - [ ] All tests pass
-   - [ ] {feature-specific checks}
-   ## On completion
-   Write `.claude/tasks/done/task-{N}-{name}-result.md`:
-   ---
-   ticket: {TICKET}
-   workflow: impl
-   task: task-{N}-{name}
-   role: implementer
-   runner: claude-code
-   model: sonnet
-   status: success | failure | partial
-   started_at: {ISO 8601 with timezone}
-   ended_at: {ISO 8601 with timezone}
-   ---
-   <result>
-     <status>success | failure</status>
-     <files><file path="{path}">{description}</file></files>
-     <tests passed="{N}" failed="{N}"><failure>{name}</failure></tests>
-     <decisions>{decisions made}</decisions>
-     <handoff>{for next task}</handoff>
-   </result>
-   ```
+   - Task format follows `templates/workflow-contract/task.schema.md` exactly.
+   - Five required elements:
+     1. **자기완결성**: implementer가 이전 대화 없이 독립 실행 가능해야 함.
+     2. **사용자 원문 복사**: `plan.md` 최상단 YAML frontmatter의 `user_prompt` 값을 task 파일 §"사용자 최초 프롬프트 원문" 블록에 그대로 복사. 요약·정제 금지.
+     3. **AC = 실행 가능 bash**: §Acceptance Criteria는 zero exit = pass인 bash 커맨드로만 작성. 추상적 서술 금지.
+     4. **주의사항 X-Y 형식**: "X 하지 마라. 이유: Y" 형식. 이유 누락 시 무효.
+     5. **On completion**: result 파일 경로와 result.schema.md 링크 명시.
 3. **Execute sequentially** — For each task:
+   - Before delegating to `implementer`, prepend `templates/workflow-contract/preamble.md` content verbatim to the implementer prompt.
    - Delegate to `implementer` → then `reviewer`
-   - If `needs-fix`: re-delegate to `implementer` with review (max 3 rounds)
-   - After 3 rounds still `needs-fix`: escalate to user with both implementation and review context
+   - If reviewer returns `needs-fix`:
+     - Filter reviewer issues to priority `p1` / `p2` only and pass those to `implementer` (p3/p4 are not forwarded — ping-pong cost avoidance).
+     - `implementer` fixes only p1·p2 issues and writes a new result. Do not overwrite the same task's review file — append a Round 2/3 section instead.
+     - max 3 rounds. If p1 / p2 issues remain after round 3, escalate to user with both implementation and review context.
+     - User deferral is recorded as `deferred: [issue summary]` in the result `<decisions>` block, or an explicit user message to the orchestrator acknowledging the issue.
+   - If reviewer returns `approved` but `[p3]` / `[p4]` issues remain: proceed. Record as follow-up TODO in result `<handoff>` (one line per item).
    - On failure: move to `.claude/tasks/failed/`, ask user
 4. **Integration** — After all tasks, delegate to `integrator` with Quality Gates from plan.md's `### Quality Gates`
 5. **Final report** — Features, test results, failures, next steps
 
+## Commit policy
+
+reviewer 가 approved 를 반환한 직후, orchestrator(`/impl`)는 다음 2단 커밋을 순서대로 수행한다.
+이 commit 들은 preamble 규칙 7과 충돌하지 않는다 — 7번은 implementer 에이전트의 자동 commit 을
+금지할 뿐, orchestrator 의 통제된 commit 은 허용된다.
+
+1. **Code commit (`feat` / `fix` / `refactor` / `docs` 중 변경 성격에 맞는 type)**:
+   ```bash
+   git add {task.outputs 에 명시된 코드/문서 경로}
+   git commit -m "{type}({scope}): {task 한 줄 요약}
+
+   Refs: .claude/plans/{TICKET}/plan.md task-{N}"
+   ```
+   `git add` 는 **task `## Outputs` 에 선언된 경로만** 사용.
+   와일드카드 전체 추가(`-A` 플래그 또는 현재 디렉토리 `.` 인수) 금지
+   (선언되지 않은 secret/대용량 파일 보호).
+
+2. **Artifact commit (`chore`)**:
+   ```bash
+   ARTIFACT_TASK=".claude/tasks/done/task-{N}-*.md"
+   ARTIFACT_RUN=".claude/runs/{TICKET}/"
+   git add "${ARTIFACT_TASK}" "${ARTIFACT_RUN}"
+   git commit -m "chore({TICKET}): task-{N} artifacts"
+   ```
+   .claude/ 가 .gitignore 에 의해 무시되는 레포라면 이 단계는 스킵하고 result 파일에
+   `<decisions>` 한 줄로 기록한다.
+
+자동 push 는 하지 않는다. 자동 PR 도 만들지 않는다 (Intentional Exclusions).
+실패 시(예: pre-commit hook 거부) 양쪽 commit 모두 롤백하지 말고 — 첫 commit 은 유지하고
+두 번째 실패만 사용자에게 보고. 절대 `--no-verify` 로 hook 우회 금지.
+
 ## On completion
 1. `rm .claude/current-ticket`
 2. If `log_repo` is configured in CLAUDE.md, remind user to run `sync-logs.sh {TICKET}`.
+3. 모든 task 완료 후, 사용자에게 작업 브랜치 이름과 push 명령(`git push -u origin feat/...`)을 안내. push / PR 생성은 사용자가 수동.
 
 ## Agents
 - `debugger` — 6-step triage protocol (read-only, opus)
@@ -91,6 +176,9 @@ Orchestrate implementation via specialist agents. Never write code directly. Pul
 - `integrator` — integration tests across all tasks (sonnet)
 - `test-engineer` — test strategy/coverage analysis (read-only, sonnet)
 
+reviewer output format SSOT: `claude-config/agents/reviewer.md` §Output format. impl routing consumes the priority tags from that schema directly.
+
 ## Rules
 - Never write code. Always delegate.
 - If spec changes, update affected pending task files.
+- Branch / commit / push 정책의 SSOT 는 이 파일의 §Branch policy / §Commit policy. preamble.md 7번과 정합.

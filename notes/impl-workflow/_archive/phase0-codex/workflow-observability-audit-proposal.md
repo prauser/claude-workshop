@@ -1,5 +1,6 @@
 # Workflow Observability & Agent Audit Proposal
 
+> Archived 2026-05-07 — partially superseded by `.claude/plans/LOCAL-20260507-harness-revamp/plan.md` (status machine + self-report validation in Phase 5). Audit/decision-record/events.jsonl ideas unabsorbed; tracked in `notes/impl-workflow/future-ideas.md`. Kept for history.
 > Status: draft for review  
 > Scope: Claude Code `/spec-plan` and `/impl` workflows first; provider-neutral extension later  
 > Date: 2026-04-25  
