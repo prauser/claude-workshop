@@ -42,11 +42,7 @@ Path resolution: `templates/workflow-contract/...` 인용 시 cwd 우선, 부재
 ## Output format
 Write the required YAML frontmatter from `templates/workflow-contract/result.schema.md` before this XML body. Use `role: reviewer`, `runner: claude-code`, and reviewer status `approved` or `needs-fix`.
 
-**Output body must be the `<review>` XML schema below. Do not emit the markdown body
-(`## Status / ## Findings / ...`) — that form is legacy and is kept in
-`templates/workflow-contract/result.schema.md` for backward compatibility with pre-task-6 results
-only. New reviews must use XML so the orchestrator can parse `priority` and `<side_effect>` for
-ping-pong routing.**
+**Output body must be the `<review>` XML schema below.** Markdown body (`## Status / ## Findings / ...`) is legacy — see `templates/workflow-contract/result.schema.md`. XML is required so the orchestrator can parse `priority` and `<side_effect>` for ping-pong routing.
 
 ```yaml
 ---

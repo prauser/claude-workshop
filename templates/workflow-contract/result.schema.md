@@ -92,8 +92,6 @@ Notes for reviewer or next task, or `none`.
 
 ## Recommended Reviewer Body — Legacy form — see Migration note above. Do not emit for new reviews.
 
-> Legacy form — see Migration note above. Do not emit for new reviews.
-
 ```markdown
 ## Status
 
