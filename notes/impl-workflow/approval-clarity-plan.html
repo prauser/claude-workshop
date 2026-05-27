@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>승인 게이트 이해도 강화 — 플래닝 시각화</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #fafafa;
+    --fg: #1f2328;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --accent-soft: #eff6ff;
+    --border: #e5e7eb;
+    --code-bg: #f3f4f6;
+    --light: #059669;
+    --light-soft: #ecfdf5;
+    --heavy: #dc2626;
+    --heavy-soft: #fef2f2;
+    --warn: #d97706;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", sans-serif;
+    line-height: 1.65; color: var(--fg); background: var(--bg); margin: 0; padding: 0;
+  }
+  .layout { display: grid; grid-template-columns: 240px 1fr; max-width: 1240px; margin: 0 auto; }
+  nav.toc {
+    position: sticky; top: 0; align-self: start;
+    padding: 24px 16px; border-right: 1px solid var(--border);
+    height: 100vh; overflow-y: auto; font-size: 13px;
+  }
+  nav.toc h2 { font-size: 12px; text-transform: uppercase; color: var(--muted); letter-spacing: 0.05em; margin: 0 0 12px; }
+  nav.toc a { display: block; padding: 4px 0; color: var(--fg); text-decoration: none; border-left: 2px solid transparent; padding-left: 8px; }
+  nav.toc a:hover { color: var(--accent); border-left-color: var(--accent); }
+  main { padding: 40px 48px; max-width: 920px; }
+  h1 { font-size: 28px; margin: 0 0 8px; }
+  h2 { font-size: 22px; margin: 48px 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 17px; margin: 28px 0 10px; }
+  p, ul, ol { margin: 10px 0; }
+  ul, ol { padding-left: 22px; }
+  li { margin: 4px 0; }
+  code { background: var(--code-bg); padding: 1px 6px; border-radius: 4px; font-size: 0.9em; font-family: "SF Mono", Menlo, monospace; }
+  pre { background: #1f2328; color: #e6edf3; padding: 16px; border-radius: 8px; overflow-x: auto; font-size: 13px; line-height: 1.5; }
+  pre code { background: transparent; padding: 0; color: inherit; }
+  table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--accent-soft); font-weight: 600; }
+  blockquote { margin: 12px 0; padding: 10px 16px; border-left: 4px solid var(--accent); background: var(--accent-soft); border-radius: 0 6px 6px 0; }
+  .lead { font-size: 16px; color: var(--muted); margin-bottom: 24px; }
+  .callout { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px 16px; margin: 16px 0; }
+  .callout strong { color: #92400e; }
+  .pill { display: inline-block; padding: 1px 9px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .pill.light { background: var(--light-soft); color: var(--light); }
+  .pill.heavy { background: var(--heavy-soft); color: var(--heavy); }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .card { border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fff; }
+  .card h3 { margin-top: 0; }
+  .card.light { border-top: 3px solid var(--light); }
+  .card.heavy { border-top: 3px solid var(--heavy); }
+  .check { list-style: none; padding-left: 0; }
+  .check li { padding-left: 24px; position: relative; }
+  .check li::before { content: "\2610"; position: absolute; left: 0; color: var(--accent); font-weight: bold; }
+  details { border: 1px solid var(--border); border-radius: 6px; padding: 8px 14px; margin: 8px 0; background: #fff; }
+  details summary { cursor: pointer; font-weight: 600; }
+  details[open] summary { margin-bottom: 8px; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+  .mermaid { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin: 16px 0; text-align: center; }
+  .tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 4px; background: var(--code-bg); color: var(--muted); }
+  @media (max-width: 880px) {
+    .layout { grid-template-columns: 1fr; }
+    nav.toc { display: none; }
+    main { padding: 24px; }
+    .grid-2 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="toc">
+    <h2>목차</h2>
+    <a href="#tldr">한눈에</a>
+    <a href="#roles">역할 & 사이클</a>
+    <a href="#cat">5 어려움 → 해법</a>
+    <a href="#dial">Friction Dial</a>
+    <a href="#layer">이해 2층 모델</a>
+    <a href="#grill">grill 통합 흐름</a>
+    <a href="#artifact">Artifact 분리</a>
+    <a href="#phase">작업 Phase</a>
+  </nav>
+
+  <main>
+    <h1>승인 게이트 이해도 강화</h1>
+    <p class="lead">게이트를 "OK 눌렀나"에서 "제대로 이해하고 승인하나"로 — 위험한 곳만 무겁게.</p>
+
+    <section id="tldr">
+      <h2>한눈에</h2>
+      <blockquote><strong>TL;DR</strong> — spec-plan/impl에 "사람이 제대로 이해하고 승인"하도록 돕는 레이어를 더한다.
+      90%는 <em>에이전트가 마크다운을 쓰는 방식</em>을 바꾸는 상시(light) 처방이고, teach-back 같은 무거운 처방은
+      <strong>위험영역에서만</strong> 발동한다. 새 명령은 안 만들고 기존 게이트에 흡수.</blockquote>
+      <div class="callout">
+        <strong>핵심 진단.</strong> 현재 승인 조건은 "사용자가 OK라고 입력했는가"(spec-plan.md:53).
+        그러나 원칙은 "이해 못 하면 내 코드가 아니다". 게이트가 <em>컴플라이언스</em>는 검사하지만
+        <em>이해도</em>는 검사하지 않는다 — 이게 최대 레버리지 지점.
+      </div>
+    </section>
+
+    <section id="roles">
+      <h2>spec-plan / impl 역할 & 제품 사이클</h2>
+      <p>두 명령이 사이클 어디를 소유하는가. spec-plan은 <strong>의도→TechSpec 번역 다리</strong>(코드 0줄),
+      impl은 <strong>TechSpec→코드+1차 QA 실행 엔진</strong>(Ship 직전 정지).</p>
+      <div class="mermaid">
+flowchart LR
+    A["기본니즈<br/>문제정의<br/><i>사람</i>"] --> B["PRD<br/><i>사람/PM</i>"]
+    B --> C["TechSpec<br/><b>spec-plan</b>"]
+    C --> D["구현·테스트<br/><b>impl</b>"]
+    D --> E["QA<br/><i>impl+사람</i>"]
+    E --> F["Ship<br/><i>사람</i>"]
+    classDef human fill:#f3f4f6,stroke:#9ca3af,color:#374151;
+    classDef plan fill:#eff6ff,stroke:#2563eb,color:#1e3a8a;
+    classDef impl fill:#ecfdf5,stroke:#059669,color:#065f46;
+    class A,B,F human; class C plan; class D,E impl;
+      </div>
+      <div class="callout">
+        <strong>통증의 구조적 원인.</strong> 워크플로우가 "문제정의·PRD는 됐다"고 가정하고 <em>TechSpec부터</em> 시작 →
+        출력이 What/How에 최적화되고 Why/Problem은 한 줄만 남음 → <b>Intent Header</b>로 처방.
+      </div>
+    </section>
+
+    <section id="cat">
+      <h2>5 어려움 → 해법</h2>
+      <table>
+        <thead><tr><th>#</th><th>카테고리</th><th>증상</th><th>클래식 + 최신 해법</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>언어·전문용어</td><td>ad-hoc/stale, "greedy bin packing"</td><td>STE100 통제영어 · Flesch-Kincaid · DDD 용어집 / LLM 자기-순화</td></tr>
+          <tr><td>2</td><td>코드 스코프</td><td>어느 파일/클래스가 어떻게</td><td><code>file:line</code> 규약 · ctags/LSP / Mermaid classDiagram · GitHub permalink</td></tr>
+          <tr><td>3</td><td>도메인 어휘</td><td>로드맵 기능명</td><td>Ubiquitous Language 용어집 (1과 동일 메커니즘)</td></tr>
+          <tr><td>4</td><td>표현 형식</td><td>줄글이라 안 읽힘</td><td>BLUF/역피라미드 · 표/체크리스트 / <code>&lt;details&gt;</code> · <code>[!WARNING]</code> · Mermaid</td></tr>
+          <tr><td>5</td><td>문제·의도 보존</td><td>무슨 문제·이름·왜 증발</td><td>PR/FAQ · RFC(Goals/Non-Goals + Alternatives) · ADR / Shape Up · JTBD</td></tr>
+        </tbody>
+      </table>
+      <details>
+        <summary>Intent Header — 카테고리 5·3 동시 처방 (6필드, 타협불가 3)</summary>
+<pre><code>Feature: {로드맵 기능명}
+Problem/Job: {누가·무엇을·왜 막힘 — 해법 언어 금지}   ★ 타협불가
+Goal / Non-Goals: {성공 정의 / 명시적 제외}
+Approach: {택한 방향 한 줄}                          ★ 타협불가
+Why (vs alternatives): {기각안 + 결정 트레이드오프}   ★ 타협불가 (가장 자주 증발)
+Appetite / PRD: {투입 가치 / 원본 링크}</code></pre>
+      </details>
+    </section>
+
+    <section id="dial">
+      <h2>Friction Dial</h2>
+      <p>모든 이해 보조가 <strong>"위험영역만 무겁게"</strong> 다이얼에 둘로 갈린다.</p>
+      <div class="grid-2">
+        <div class="card light">
+          <h3><span class="pill light">상시 LIGHT</span> 쓰기 규율</h3>
+          <ul>
+            <li>Intent Header</li>
+            <li>BLUF / 표 / 체크리스트</li>
+            <li>용어집 + 인라인 풀이</li>
+            <li>구체 <code>file:line</code> 링크</li>
+            <li>관용구 자동 순화 · 자기-순화 패스</li>
+          </ul>
+          <p class="tag">비용 ≈ 0 · 항상 적용</p>
+        </div>
+        <div class="card heavy">
+          <h3><span class="pill heavy">위험영역 HEAVY</span> 상호작용 확인</h3>
+          <ul>
+            <li>Mermaid 클래스/호출 다이어그램 + before/after diff</li>
+            <li>teach-back (스코프 본인 말로 재진술)</li>
+            <li>Ambiguity 항목별 read-back (sequential grill)</li>
+            <li>사람이 쓴 설계노트</li>
+            <li>analyzer/reviewer 항상 + 위험유형별 quality gate</li>
+          </ul>
+          <p class="tag">마찰↑ · 위험영역에서만</p>
+        </div>
+      </div>
+      <h3>위험영역 정의 (가이드라인 §3) & 태깅</h3>
+      <p>메모리(GC/포인터 수명) · 리플리케이션 · 동시성(GameThread vs 비동기) · 아키텍처 결정 · 빌드/배포.</p>
+      <blockquote><strong>하이브리드 (d) 태깅:</strong> CLAUDE.md <code>risk_areas:</code> 선언을 baseline →
+      AI가 후보 추가 플래그 → 사람은 <em>상향만 쉽게</em>(하향 어렵게). false-negative 쪽으로 안전하게 기움.</blockquote>
+    </section>
+
+    <section id="layer">
+      <h2>이해 2층 모델</h2>
+      <table>
+        <thead><tr><th>층</th><th>확인 대상</th><th>언제</th><th>강도</th></tr></thead>
+        <tbody>
+          <tr><td>Gate 0 align</td><td>문제 의도 일치</td><td>상시 (grill 스킵 무관)</td><td><span class="pill light">light</span></td></tr>
+          <tr><td>위험영역 teach-back</td><td>기술 계획·스코프 이해</td><td>Gate 2/3, 위험영역만</td><td><span class="pill heavy">heavy</span></td></tr>
+        </tbody>
+      </table>
+      <div class="callout">
+        <strong>grill 스킵 ≠ 인지 스킵.</strong> pre-search grill은 <em>입력 품질</em> 장치이지 <em>인지 확인</em> 장치가 아니다.
+        트리거(prompt 명료도)는 prompt를 재지 사람의 이해를 재지 않는다. 인지 바닥(Gate 0 align)은 스킵과 독립적으로 무조건 작동.
+      </div>
+    </section>
+
+    <section id="grill">
+      <h2>grill 통합 흐름</h2>
+      <p><code>/grill-with-docs</code>를 별도 명령으로 얹지 않고 ① <code>CONTEXT.md</code> 용어집 포맷,
+      ② grill 인터뷰를 위험영역 heavy 경로에 — <strong>두 알맹이만 흡수</strong>.</p>
+      <div class="mermaid">
+flowchart TD
+    T["ticket fetch (Jira)"] --> Q{"prompt 모호<br/>또는 --grill?"}
+    Q -->|"예 (희귀)"| G["Pre-search grill<br/>→ refined_user_prompt"]
+    Q -->|"아니오"| S
+    G --> S["Step 0<br/>5-agent 검색"]
+    S --> A0["Gate 0 align<br/>문제 한 줄 ↔ findings diff"]
+    A0 --> G1["Gate 1 Requirements"]
+    G1 --> G2["Gate 2 Plan + Ambiguities"]
+    G2 --> R{"위험영역<br/>항목?"}
+    R -->|"예"| H["sequential grill<br/>+ teach-back + 설계노트"]
+    R -->|"아니오"| B["batch A/B 표"]
+    H --> G3["Gate 3 Test Strategy"]
+    B --> G3
+    G3 --> SV["Save plan.md"]
+    classDef light fill:#ecfdf5,stroke:#059669,color:#065f46;
+    classDef heavy fill:#fef2f2,stroke:#dc2626,color:#991b1b;
+    class A0,B light; class H heavy;
+      </div>
+      <p class="tag">refined_user_prompt → plan.md frontmatter → task 파일로 verbatim 전파 (impl.md:118 정합)</p>
+    </section>
+
+    <section id="artifact">
+      <h2>Artifact 분리 — 빈도 기반</h2>
+      <blockquote>레포 원칙: <strong>에이전트가 필터·ID인용하면 yaml, 사람이 읽고 인라인 편집하면 md.</strong>
+      (근거: adr.yaml 헤더 "cite entries by ID", design.md:30 "<code>stacks:</code> 태그 필터")</blockquote>
+      <table>
+        <thead><tr><th>아티팩트</th><th>포맷</th><th>이유</th></tr></thead>
+        <tbody>
+          <tr><td>도메인 용어집 <code>CONTEXT.md</code></td><td><b>md</b> (신규)</td><td>빈번·사람이 읽음·grill 인라인 append, ID 인용 불필요</td></tr>
+          <tr><td>ADR <code>adr.yaml</code></td><td><b>yaml</b> (기존)</td><td>드묾·에이전트가 <code>stacks:</code> 필터 + ID 인용</td></tr>
+          <tr><td>Intent Header</td><td>plan.md frontmatter</td><td>6필드, 타협불가 3</td></tr>
+        </tbody>
+      </table>
+      <p>→ grill이 ADR 생성 시(hard-to-reverse 3조건일 때만) <b>adr.yaml 엔트리로</b> append. 빈번한 용어는 md로 가볍게.</p>
+    </section>
+
+    <section id="phase">
+      <h2>작업 Phase</h2>
+      <p class="tag">명령/에이전트 편집은 claude-config/ → 후 ./deploy.sh</p>
+      <div class="grid-2">
+        <div class="card">
+          <h3>Phase 1 — 상시 쓰기 규율 <span class="pill light">1순위</span></h3>
+          <ul class="check">
+            <li>Intent Header (spec-plan plan.md + Gate 1)</li>
+            <li>출력 구조화 (BLUF·<code>[!WARNING]</code>·<code>&lt;details&gt;</code>)</li>
+            <li>구체 <code>file:line</code> + GitHub permalink</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Phase 2 — 용어집 & 언어</h3>
+          <ul class="check">
+            <li>CONTEXT.md + <code>glossary_path</code></li>
+            <li>부트스트랩(코드/PRD 추출 → confirm)</li>
+            <li>인라인 풀이 · 관용구 순화 · 자기-순화</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Phase 3 — grill 통합</h3>
+          <ul class="check">
+            <li>Gate 0 align (상시)</li>
+            <li>Pre-search grill (조건부)</li>
+            <li>/impl free-text 업그레이드 (impl.md:79)</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Phase 4 — 위험영역 다이얼</h3>
+          <ul class="check">
+            <li><code>risk_areas:</code> 선언</li>
+            <li>AI 태깅 + 사람 상향</li>
+            <li>heavy 처방 + analyzer Mermaid</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Phase 5 — (선택) 보너스</h3>
+          <ul class="check">
+            <li>debugger 가설-선택 게이트</li>
+            <li>PR 본문 빈칸 스캐폴드</li>
+            <li>HTML export (장수 문서만)</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>미결 / 확인 필요</h3>
+          <ul>
+            <li>grill 중첩 순서 확정</li>
+            <li>용어=md / ADR=yaml 동의</li>
+            <li>ctags/LSP file:line (Rider/VS)</li>
+            <li><code>risk_areas</code> 사전 합의 거부감</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <hr>
+    <p class="tag">원본 플래닝: notes/impl-workflow/approval-clarity-plan.md · 브랜치: claude/workflow-approval-clarity-m6oU9</p>
+  </main>
+</div>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad: true, theme: 'neutral', flowchart: { curve: 'basis' } });
+</script>
+</body>
+</html>
