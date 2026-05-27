@@ -162,6 +162,7 @@ Appetite / PRD: {투입 가치 / 원본 링크}</code></pre>
             <li>용어집 + 인라인 풀이</li>
             <li>구체 <code>file:line</code> 링크</li>
             <li>관용구 자동 순화 · 자기-순화 패스</li>
+            <li>위험영역 회피 금지 (<code>[!CAUTION]</code> 명시)</li>
           </ul>
           <p class="tag">비용 ≈ 0 · 항상 적용</p>
         </div>
@@ -177,10 +178,17 @@ Appetite / PRD: {투입 가치 / 원본 링크}</code></pre>
           <p class="tag">마찰↑ · 위험영역에서만</p>
         </div>
       </div>
-      <h3>위험영역 정의 (가이드라인 §3) & 태깅</h3>
+      <div class="callout">
+        <strong>위험영역 회피 금지 (상시·결정됨).</strong> AI는 자기가 <em>실제로 건드리는</em> 위험영역을 "범위 밖"으로
+        밀어낼 수 없다. 건드리면 <code>[!CAUTION]</code>로 (a) 어느 영역을 건드리는지 (b) 무엇을 확인할지 명시한다.
+        "범위 밖"은 <em>정말 안 닿을 때만</em>(<code>[!NOTE]</code>). 회피는 부정직이고, 권한/리플리케이션처럼
+        기능 필수 상호작용이면 작동 불가를 낳는다. (가이드라인 §3)
+      </div>
+      <h3>위험영역 정의 (§3) & 태깅 <span class="pill heavy">관리 방식 보류 TBD</span></h3>
       <p>메모리(GC/포인터 수명) · 리플리케이션 · 동시성(GameThread vs 비동기) · 아키텍처 결정 · 빌드/배포.</p>
-      <blockquote><strong>하이브리드 (d) 태깅:</strong> CLAUDE.md <code>risk_areas:</code> 선언을 baseline →
-      AI가 후보 추가 플래그 → 사람은 <em>상향만 쉽게</em>(하향 어렵게). false-negative 쪽으로 안전하게 기움.</blockquote>
+      <blockquote><strong>하이브리드 (d) 태깅 (참고안, 미확정):</strong> CLAUDE.md <code>risk_areas:</code> 선언을 baseline →
+      AI가 후보 추가 플래그 → 사람은 <em>상향만 쉽게</em>(하향 어렵게). false-negative 쪽으로 안전하게 기움.
+      <br><em>※ 태깅·teach-back·heavy 처방 등 관리 방식은 판단 보류.</em></blockquote>
     </section>
 
     <section id="layer">
@@ -195,6 +203,8 @@ Appetite / PRD: {투입 가치 / 원본 링크}</code></pre>
       <div class="callout">
         <strong>grill 스킵 ≠ 인지 스킵.</strong> pre-search grill은 <em>입력 품질</em> 장치이지 <em>인지 확인</em> 장치가 아니다.
         트리거(prompt 명료도)는 prompt를 재지 사람의 이해를 재지 않는다. 인지 바닥(Gate 0 align)은 스킵과 독립적으로 무조건 작동.
+        <br><strong>멀티턴.</strong> Gate 0 align의 "한 문장"은 시작 씨앗이지 상한이 아니다 — 어긋남이 여러 건이면 여러 턴 정렬,
+        복잡하면 grill로 자연 승격(같은 one-at-a-time 엔진).
       </div>
     </section>
 
@@ -222,6 +232,7 @@ flowchart TD
     class A0,B light; class H heavy;
       </div>
       <p class="tag">refined_user_prompt → plan.md frontmatter → task 파일로 verbatim 전파 (impl.md:118 정합)</p>
+      <p class="tag">※ 위험영역 분기의 heavy 처리(sequential grill·teach-back)는 <strong>관리 방식 보류(TBD)</strong> — 지금 확정된 건 상시 <code>[!CAUTION]</code> 명시 규칙뿐. pre-search grill은 멀티턴 wave.</p>
     </section>
 
     <section id="artifact">
@@ -249,6 +260,7 @@ flowchart TD
             <li>Intent Header (spec-plan plan.md + Gate 1)</li>
             <li>출력 구조화 (BLUF·<code>[!WARNING]</code>·<code>&lt;details&gt;</code>)</li>
             <li>구체 <code>file:line</code> + GitHub permalink</li>
+            <li>위험영역 회피 금지 규칙 (<code>[!CAUTION]</code>)</li>
           </ul>
         </div>
         <div class="card">
@@ -268,7 +280,8 @@ flowchart TD
           </ul>
         </div>
         <div class="card">
-          <h3>Phase 4 — 위험영역 다이얼</h3>
+          <h3>Phase 4 — 위험영역 다이얼 <span class="pill heavy">보류 TBD</span></h3>
+          <p class="tag">관리 방식 미정. 단 <code>[!CAUTION]</code> 회피 금지 규칙은 Phase 1에 먼저 적용.</p>
           <ul class="check">
             <li><code>risk_areas:</code> 선언</li>
             <li>AI 태깅 + 사람 상향</li>
@@ -284,12 +297,14 @@ flowchart TD
           </ul>
         </div>
         <div class="card">
-          <h3>미결 / 확인 필요</h3>
+          <h3>결정됨 / 보류</h3>
           <ul>
-            <li>grill 중첩 순서 확정</li>
-            <li>용어=md / ADR=yaml 동의</li>
-            <li>ctags/LSP file:line (Rider/VS)</li>
-            <li><code>risk_areas</code> 사전 합의 거부감</li>
+            <li>✓ Gate 0·grill 멀티턴</li>
+            <li>✓ 인라인 풀이 = 문서 단위</li>
+            <li>✓ 위험영역 회피 금지 규칙</li>
+            <li>✓ 용어=md / ADR=yaml</li>
+            <li>⏸ 위험영역 관리 방식 (TBD)</li>
+            <li>? ctags/LSP file:line (Rider/VS)</li>
           </ul>
         </div>
       </div>

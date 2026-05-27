@@ -64,15 +64,30 @@ branch: claude/workflow-approval-clarity-m6oU9
 
 | 강도 | 성격 | 항목 |
 |---|---|---|
-| **상시 (light)** | 쓰기 규율 | Intent Header · BLUF/표/체크리스트 · 용어집+인라인 풀이 · 구체 `file:line` 링크 · 관용구 자동 순화 · 자기-순화 패스 |
+| **상시 (light)** | 쓰기 규율 | Intent Header · BLUF/표/체크리스트 · 용어집+인라인 풀이 · 구체 `file:line` 링크 · 관용구 자동 순화 · 자기-순화 패스 · **위험영역 회피 금지(`[!CAUTION]` 명시)** |
 | **무겁게 (heavy)** | 상호작용 확인 | Mermaid 클래스/호출 다이어그램 + before/after diff · teach-back(스코프 본인 말로 재진술) · Ambiguity 항목별 read-back(sequential grill) · 사람이 쓴 설계노트 · analyzer/reviewer 항상 · 위험유형별 quality gate |
 
-### 위험영역 정의 (가이드라인 §3)
+> [!IMPORTANT]
+> **위험영역 *관리 방식*(태깅 메커니즘·teach-back·설계노트·heavy 처방)은 판단 보류(TBD).**
+> 아래 정의/태깅은 참고안일 뿐 미확정. 단, 관리 방식과 **무관하게 지금 적용하는 상시 규칙 1건은 결정됨**(↓).
+
+### 위험영역 회피 금지 (상시·결정됨)
+
+> **AI는 자기가 실제로 건드리는 위험영역을 "범위 밖"으로 밀어낼 수 없다.**
+> 건드리면 반드시 `[!CAUTION]`로 (a) 어느 영역을 건드리는지 (b) 무엇을 확인해야 하는지 명시한다.
+> "범위 밖"은 *정말 안 닿을 때만*.
+
+- **진짜 범위 밖** (정말 안 닿음, 예: 자동 판매) → `[!NOTE]` 경계 메모로 OK.
+- **위험영역을 실제로 건드림** (변경이 그 경로와 상호작용) → `[!CAUTION]` "건드린다 + 확인할 것". **제외 불가.**
+- 회피("범위 밖"으로 밀기)는 *부정직*이고, 권한/리플리케이션처럼 기능 필수 상호작용이면 *작동 불가*를 낳음.
+- 근거: 가이드라인 §3 "AI가 자신 있게 틀리는 곳" — 무거운 다이얼 없이도 "조심해야 함"을 사람에게 전달하는 인지 바닥.
+
+### 위험영역 정의 (가이드라인 §3) — *참고, 관리 방식 보류*
 
 메모리(UPROPERTY/GC/포인터 수명) · 네트워크 리플리케이션(권한/조건/호출주체) · 동시성(GameThread vs 비동기)
 · 아키텍처 결정(모듈 의존성/서브시스템) · 빌드/배포 파이프라인.
 
-### 위험영역 태깅 = 하이브리드 (d)
+### 위험영역 태깅 = 하이브리드 (d) — *관리 방식, 보류(TBD)*
 
 1. **CLAUDE.md `## Implementation Config`에 위험 경로/모듈 선언**(`risk_areas:`)을 baseline으로.
 2. AI(Code Agent/reviewer)가 후보를 **추가 플래그**.
@@ -84,6 +99,10 @@ branch: claude/workflow-approval-clarity-m6oU9
 |---|---|---|---|
 | **Gate 0 align** | 문제 의도 일치 | 상시 (grill 스킵 여부 무관) | light |
 | **위험영역 teach-back** | 기술 계획·스코프 이해 | Gate 2/3, 위험영역만 | heavy |
+
+> **멀티턴.** Gate 0 align의 "한 문장"은 *시작 씨앗*이지 상한이 아니다. diff가 어긋남을 여러 건 띄우면
+> 정렬을 **여러 턴** 이어가고, 복잡하면 grill로 자연 승격한다 — Gate 0 align과 grill은 *같은 one-at-a-time
+> 엔진*이고 복잡도에 따라 가벼운 정렬 ↔ 본격 grill로 연속적으로 변한다.
 
 > [!IMPORTANT]
 > **grill 스킵 ≠ 인지 스킵.** pre-search grill은 *입력 품질* 장치이지 *인지 확인* 장치가 아니다.
@@ -97,7 +116,7 @@ branch: claude/workflow-approval-clarity-m6oU9
 
 | 위치 | 무엇 | 강도 | 근거 |
 |---|---|---|---|
-| Pre-Gate 0 (조건부·희귀) | grill-me로 vague prompt 정련 → `refined_user_prompt` | 트리거 발동 시만 | 입력 품질 ★★★★★ |
+| Pre-Gate 0 (조건부·희귀) | grill-me로 vague prompt 정련 → `refined_user_prompt` (**멀티턴 wave: 목표→edge→가정, 캡 있음**) | 트리거 발동 시만 | 입력 품질 ★★★★★ |
 | Gate 0 (상시) | 한 문장 ↔ Step 0 findings align 대화 | light | 의도 일치 |
 | Gate 2 ambiguities | 위험영역 항목만 sequential grill, 나머지 batch 표 | heavy(위험영역) | 다이얼 |
 | /impl free-text (impl.md:79) | 약한 "bullet 확인"을 grill로 업그레이드 | 조건부 | 최약 지점 |
@@ -141,14 +160,16 @@ branch: claude/workflow-approval-clarity-m6oU9
 
 ### Phase 1 — 상시 쓰기 규율 (ROI 최고, 다이얼 무관) ★ 1순위
 - [ ] **Intent Header** 도입 — `spec-plan.md` Step 4 plan.md frontmatter + Gate 1 상단 제시. 6필드, 타협불가 3.
-- [ ] **출력 구조화** — `spec-plan.md` 게이트 출력 템플릿에 섹션별 BLUF 1줄, breaking change `[!WARNING]`, 깊은 근거 `<details>`, 작업분해 체크리스트.
+- [ ] **출력 구조화** — `spec-plan.md` 게이트 출력 템플릿에 섹션별 BLUF(Bottom Line Up Front, 결론 먼저) 1줄, breaking change `[!WARNING]`, 깊은 근거 `<details>`, 작업분해 체크리스트.
 - [ ] **구체 file:line** — Impact Scope(Gate 2)를 "the Weapon class"가 아니라 `Source/Combat/Weapon.cpp:128`(→GitHub permalink 마크다운 링크)로 강제.
-- 파일: `claude-config/commands/spec-plan.md`
+- [ ] **위험영역 회피 금지 규칙** — `spec-plan.md`/`preamble.md`에 "실제로 건드리는 위험영역은 `[!CAUTION]`로 (영역+확인할 것) 명시, '범위 밖' 처리 금지" 규칙 추가 (§4 상시 결정 규칙).
+- 파일: `claude-config/commands/spec-plan.md`, `templates/workflow-contract/preamble.md`
 
 ### Phase 2 — 용어집 & 언어 순화
 - [ ] **CONTEXT.md 포맷** + `glossary_path` config 추가. 스켈레톤: `templates/project-setup/docs/CONTEXT.md`.
 - [ ] **부트스트랩 패스** — 코드/PRD에서 용어 후보 추출 → 사람 confirm(1회).
 - [ ] **인라인 풀이 + 관용구 순화** 규칙 — `preamble.md` / spec-plan 프롬프트. CS 용어 첫 등장 시 한 줄 풀이, `stale→오래된` 등 순화 맵.
+  - 풀이 범위 = **문서(plan.md) 단위 첫 등장 1회**(세션 단위 초기화 아님). 같은 문서 내 재등장은 생략, 문서가 바뀌면 다시 풀이. CONTEXT.md 등록어는 인라인 풀이 대신 **링크로 대체**.
 - [ ] **자기-순화 패스** — 출력 직전 "비원어민 주니어로 다시 읽고 불명확 문장 재작성".
 - 파일: `templates/workflow-contract/preamble.md`, `claude-config/commands/init-docs.md`, `templates/project-setup/`
 
@@ -159,7 +180,11 @@ branch: claude/workflow-approval-clarity-m6oU9
 - [ ] (선택) `references/`에 grill-with-docs 클론해 문구 정렬 (분석용, rules/references.md).
 - 파일: `claude-config/commands/spec-plan.md`, `claude-config/commands/impl.md`
 
-### Phase 4 — 위험영역 다이얼 (heavy 경로)
+### Phase 4 — 위험영역 다이얼 (heavy 경로) — *보류(TBD)*
+
+> 관리 방식 미정(태깅 메커니즘·heavy 처방). **단 "위험영역 회피 금지 + `[!CAUTION]` 명시"(§4)는 Phase 1에 포함되는
+> 상시 규칙으로, 이 보류와 무관하게 먼저 적용된다.** 아래 항목은 관리 방식 확정 후 착수.
+
 - [ ] **risk_areas 선언** — `CLAUDE-skeleton.md` `## Implementation Config`에 `risk_areas:` 추가.
 - [ ] **태깅** — Code Agent/reviewer가 task/diff에 위험 태그, 사람 상향 가능.
 - [ ] **heavy 처방 발동** — 위험 태그 시: teach-back + 사람 설계노트 + Gate 2 sequential grill + analyzer/reviewer 항상 + 위험유형별 quality gate.
@@ -171,8 +196,14 @@ branch: claude/workflow-approval-clarity-m6oU9
 - [ ] **PR 본문 스캐폴드** — AI 생성문 대신 "의도/리뷰포인트" 빈칸.
 - [ ] **HTML export** — 장수 문서만 pandoc/MkDocs (매 PR 산출물엔 미적용).
 
-## 10. 미결 / 확인 필요
-- Pre-search grill ↔ Gate 0 align **중첩 순서** 최종 확정 (권고: pre=조건부 희귀, Gate 0=상시 light).
-- 용어=md / ADR=yaml **빈도 기반 분리** 동의 여부.
+## 10. 결정됨 / 보류
+
+**결정됨 (이번 논의):**
+- Gate 0 align ↔ grill = 같은 멀티턴 엔진. 한 문장은 씨앗, 복잡 시 grill로 승격. pre-search grill = 멀티턴 wave(캡).
+- 인라인 풀이 = **문서 단위 첫 등장** + CONTEXT.md 영속/링크 (세션 초기화 아님).
+- **위험영역 회피 금지 + `[!CAUTION]` 명시** (상시 규칙, Phase 1).
+- 용어=md / ADR=yaml **빈도 기반 분리**.
+
+**보류 (TBD):**
+- 위험영역 *관리 방식* 전체 — 태깅 메커니즘 / teach-back / 설계노트 / heavy 다이얼 (Phase 4). 판단 보류.
 - UE 코드베이스에서 ctags/LSP로 `file:line` 해석이 Rider/VS 환경에서 도는지.
-- `risk_areas` 사전 합의를 CLAUDE.md에 박는 것에 대한 팀 거부감 여부.
