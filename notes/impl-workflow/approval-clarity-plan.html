@@ -212,9 +212,16 @@ Appetite / PRD: {투입 가치 / 원본 링크}</code></pre>
       <h2>grill 통합 흐름</h2>
       <p><code>/grill-with-docs</code>를 별도 명령으로 얹지 않고 ① <code>CONTEXT.md</code> 용어집 포맷,
       ② grill 인터뷰를 위험영역 heavy 경로에 — <strong>두 알맹이만 흡수</strong>.</p>
+      <div class="callout">
+        <strong>준비도 점검 (Readiness Check) — 맨 앞 진단.</strong> 일 시작 전에 입력(티켓/prompt/PRD)이 최소
+        가이드라인을 갖췄는지·이상한 게 없는지 3등급으로 뽑는다 — <strong>필수</strong>(없으면 grill/정지) ·
+        <strong>산출예정</strong>(spec-plan이 만듦, 표시만) · <strong>이상</strong>(모순/과도, 즉시 플래그).
+        <code>[!CAUTION]</code>가 출력 쪽 인지 바닥이면, 이건 <em>입력 쪽</em> 인지 바닥 (가이드라인 §2).
+      </div>
       <div class="mermaid">
 flowchart TD
-    T["ticket fetch (Jira)"] --> Q{"prompt 모호<br/>또는 --grill?"}
+    T["ticket fetch + 입력수집"] --> RC["준비도 점검<br/>필수·산출예정·이상"]
+    RC --> Q{"prompt 모호<br/>또는 --grill?"}
     Q -->|"예 (희귀)"| G["Pre-search grill<br/>→ refined_user_prompt"]
     Q -->|"아니오"| S
     G --> S["Step 0<br/>5-agent 검색"]
@@ -229,7 +236,7 @@ flowchart TD
     G3 --> SV["Save plan.md"]
     classDef light fill:#ecfdf5,stroke:#059669,color:#065f46;
     classDef heavy fill:#fef2f2,stroke:#dc2626,color:#991b1b;
-    class A0,B light; class H heavy;
+    class A0,B,RC light; class H heavy;
       </div>
       <p class="tag">refined_user_prompt → plan.md frontmatter → task 파일로 verbatim 전파 (impl.md:118 정합)</p>
       <p class="tag">※ 위험영역 분기의 heavy 처리(sequential grill·teach-back)는 <strong>관리 방식 보류(TBD)</strong> — 지금 확정된 건 상시 <code>[!CAUTION]</code> 명시 규칙뿐. pre-search grill은 멀티턴 wave.</p>
@@ -261,6 +268,7 @@ flowchart TD
             <li>출력 구조화 (BLUF·<code>[!WARNING]</code>·<code>&lt;details&gt;</code>)</li>
             <li>구체 <code>file:line</code> + GitHub permalink</li>
             <li>위험영역 회피 금지 규칙 (<code>[!CAUTION]</code>)</li>
+            <li>준비도 점검 (맨 앞 입력 진단)</li>
           </ul>
         </div>
         <div class="card">
@@ -299,6 +307,7 @@ flowchart TD
         <div class="card">
           <h3>결정됨 / 보류</h3>
           <ul>
+            <li>✓ 준비도 점검 (맨 앞 진단)</li>
             <li>✓ Gate 0·grill 멀티턴</li>
             <li>✓ 인라인 풀이 = 문서 단위</li>
             <li>✓ 위험영역 회피 금지 규칙</li>

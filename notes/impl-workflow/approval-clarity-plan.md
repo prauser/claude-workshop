@@ -124,7 +124,8 @@ branch: claude/workflow-approval-clarity-m6oU9
 
 흐름:
 ```
-1. ticket fetch (Jira)          ← 채워진 슬롯은 grill에서 스킵
+1. ticket fetch + 입력 수집 (Jira / prompt / PRD)
+1.5 준비도 점검 → 리포트 (필수 / 산출예정 / 이상)   ← 필수 빠짐→grill·정지, 이상→즉시 플래그
 2. [조건부] Pre-search grill     ← prompt가 검색 불가할 만큼 모호 / --grill 일 때만 → refined_user_prompt
 3. Step 0 (5-agent, refined로 검색)
 4. Gate 0 align (상시)          ← "당신 문제 한 줄 ↔ 내가 찾은 것" diff + 짧은 대화
@@ -132,6 +133,30 @@ branch: claude/workflow-approval-clarity-m6oU9
 ```
 
 `refined_user_prompt`는 plan.md frontmatter `user_prompt`로, 다시 task 파일로 verbatim 전파(impl.md:118 규칙과 정합).
+
+### 준비도 점검 (Readiness Check) — 맨 앞 진단 (상시·light)
+
+일감을 받자마자, 일 시작 *전에* 최소 가이드라인이 갖춰졌는지·이상한 게 없는지 진단해 짧은 리포트로 뽑는다.
+grill로 *고치기* 전에 빵꾸를 *발견*하는 단계 — 결과가 "grill 켤지 / 플래그하고 진행할지"를 라우팅한다.
+
+3등급 분류 (전부 요구하지 않음 — 티켓 완벽 spec 요구는 도구를 짜증나게 함):
+- **필수(must-have)** — 없으면 시작 불가: *무엇을 해달라는지(문제/요청)*. → pre-search grill 또는 정지.
+- **산출예정(will-produce)** — 없어도 정상, spec-plan이 *만들 것*: 상세 방향성·세부 AC. → "이건 우리가 정함" 표시만.
+- **이상/모순(odd)** — 즉시 사람에게: 설명↔AC 모순, 방향성이 컨벤션과 충돌, 범위가 appetite 대비 과도 등.
+
+> 분별: "해결 방향성 없음"은 보통 *필수 아님*(spec-plan이 정하는 일). 단 *틀린/모순된* 방향성은 odd로 잡는다.
+
+```
+┌─ 준비도 점검 · OVDR-2231 ──────────────────────────┐
+│ ✅ 문제 정의      티켓에 있음 ("인벤토리 꽉 차면 정리")
+│ ⚠️ 해결 방향성    명시 안 됨 → spec-plan이 Gate 2에서 결정 (정상)
+│ ✅ 성공 기준(AC)  티켓 AC 3건 있음
+│ ❓ 이상           AC "안정 정렬"이 설명에 없음 — 의도된 추가 요구인가?
+└────────────────────────────────────────────────────┘
+```
+
+`[!CAUTION]` 회피 금지가 **출력 쪽** 인지 바닥이라면, 준비도 점검은 **입력 쪽** 인지 바닥
+(가이드라인 §2 "설계는 사람이 먼저"의 기계적 점검).
 
 ## 7. Artifact 결정 — 빈도 기반 분리
 
@@ -163,6 +188,7 @@ branch: claude/workflow-approval-clarity-m6oU9
 - [ ] **출력 구조화** — `spec-plan.md` 게이트 출력 템플릿에 섹션별 BLUF(Bottom Line Up Front, 결론 먼저) 1줄, breaking change `[!WARNING]`, 깊은 근거 `<details>`, 작업분해 체크리스트.
 - [ ] **구체 file:line** — Impact Scope(Gate 2)를 "the Weapon class"가 아니라 `Source/Combat/Weapon.cpp:128`(→GitHub permalink 마크다운 링크)로 강제.
 - [ ] **위험영역 회피 금지 규칙** — `spec-plan.md`/`preamble.md`에 "실제로 건드리는 위험영역은 `[!CAUTION]`로 (영역+확인할 것) 명시, '범위 밖' 처리 금지" 규칙 추가 (§4 상시 결정 규칙).
+- [ ] **준비도 점검(Readiness Check)** — `spec-plan.md` On activation 직후, 입력(티켓/prompt/PRD)을 최소 가이드라인 체크리스트에 대조해 3등급(필수/산출예정/이상) 리포트 출력. 필수 빠짐→grill·정지, 이상→즉시 플래그 (§6).
 - 파일: `claude-config/commands/spec-plan.md`, `templates/workflow-contract/preamble.md`
 
 ### Phase 2 — 용어집 & 언어 순화
@@ -202,6 +228,7 @@ branch: claude/workflow-approval-clarity-m6oU9
 - Gate 0 align ↔ grill = 같은 멀티턴 엔진. 한 문장은 씨앗, 복잡 시 grill로 승격. pre-search grill = 멀티턴 wave(캡).
 - 인라인 풀이 = **문서 단위 첫 등장** + CONTEXT.md 영속/링크 (세션 초기화 아님).
 - **위험영역 회피 금지 + `[!CAUTION]` 명시** (상시 규칙, Phase 1).
+- **준비도 점검(Readiness Check)** = 맨 앞 입력 진단, 3등급(필수/산출예정/이상). 상시 규칙, Phase 1.
 - 용어=md / ADR=yaml **빈도 기반 분리**.
 
 **보류 (TBD):**
