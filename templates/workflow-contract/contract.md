@@ -111,7 +111,7 @@ If multiple commands are run, append each command with enough context to connect
 
 ## Common Preamble
 
-매 task 호출 직전 runner는 task 본문 앞에 다음 7개 규칙을 prepend한다. in-session·headless-claude·
+매 task 호출 직전 runner는 task 본문 앞에 다음 9개 규칙을 prepend한다. in-session·headless-claude·
 headless-codex 모두 동일.
 
 1. 작업 전에 task 파일과 §사전 준비에 명시된 모든 파일을 읽고 설계 의도를 이해하라.
@@ -121,6 +121,8 @@ headless-codex 모두 동일.
 5. 실패한 테스트를 비활성화·skip·삭제하지 마라. 원인을 고치거나 result에 partial로 기록하라.
 6. 모호한 결정은 result 파일 `<decisions>`에 한 줄로 기록하라.
 7. 자동 commit / push / PR을 만들지 마라. 변경 후 `git status`만 보고하고 멈춘다 (commit은 사용자/orchestrator가 처리).
+8. 위험영역 회피 금지 — baseline 5종(메모리·리플리케이션·동시성·아키텍처·빌드/배포) + plan.md `risk_areas:` 중 하나라도 실제로 닿으면 `[!CAUTION]` 명시 + `risk_acks:` 기록. 상세는 `preamble.md` §8.
+9. 출력 직전 자기-순화 휴리스틱 — 40단어 이상 문장 분리, 첫 등장 약어는 한 줄 풀이, "out of scope" 단독 사용 금지. 상세는 `preamble.md` §9.
 
 Runner 인터페이스: prepend는 텍스트 합성으로 구현. in-session은 `/impl`이 implementer에 보내는
 prompt 앞에 직접 합치고, headless 러너는 task 파일 본문을 stdin/argv로 넘기기 전에 합친다.

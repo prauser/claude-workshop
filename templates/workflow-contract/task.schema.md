@@ -21,6 +21,15 @@ Rules:
 ## Required Sections
 
 ```markdown
+---
+ticket: {TICKET}
+task_id: task-{N}-{kebab-name}
+plan_sha: {`git hash-object .claude/plans/{TICKET}/plan.md` 결과 — working tree blob SHA. tracking 무관}
+intent_problem: |
+  {plan.md frontmatter 의 intent.problem 한 줄 verbatim. 의역 금지.}
+contributes_to: {Approach 의 어느 단계인지 — spec-plan 이 task 분해 시 자동 생성}
+---
+
 # Task {N}: {feature 이름}
 
 > Ticket: {TICKET}
@@ -68,6 +77,16 @@ Rules:
 
 ## Section Requirements
 
+### YAML frontmatter (Required)
+
+`plan_sha` / `intent_problem` / `contributes_to` 3개 필드는 telemetry-friendly schema 의 일부.
+
+- **`plan_sha`** — `git hash-object .claude/plans/{TICKET}/plan.md` 결과 (working tree blob SHA). impl 도중 plan 이 갱신되면 mismatch 로 *재정렬 신호*. tracking 무관·gitignored 레포에서도 동작. 측정 지표 #3(plan_sha rebase 빈도) 의 근거.
+- **`intent_problem`** — plan.md frontmatter 의 `intent.problem` 한 줄을 verbatim 복사. AI 가 의역하지 못하도록 잠금. 측정 지표 #2(Intent 변경률) 의 근거.
+- **`contributes_to`** — 본 task 가 plan.md `intent.approach` 의 어느 단계를 이행하는지 한 줄. spec-plan(또는 `/impl` task 분해) 이 자동 생성.
+
+> Runtime deviation 은 *result* frontmatter `plan_deviations:` 에 implementer 가 append (result.schema.md 참조). pending task 에는 두지 않음 — 분해 시점에 알면 plan 에 적었어야 함.
+
 ### 사용자 최초 프롬프트 원문 (Required)
 
 `spec-plan`이 저장한 `plan.md` 최상단 YAML frontmatter의 `user_prompt` 값을 그대로 복사한다. 요약·정제 금지. task 간 일관성 확인의 기준이 된다.
@@ -114,6 +133,15 @@ Note: "사용자 최초 프롬프트 원문" and "주의사항" are defined as R
 ## Minimal Example
 
 ```markdown
+---
+ticket: OVDR-1234
+task_id: task-1-parser-fallback
+plan_sha: 7c2a9f1
+intent_problem: |
+  파서가 메타데이터 누락 시 throw 해서 다운스트림 파이프라인이 멈춘다.
+contributes_to: "Approach §1 — parseMetadata 폴백 경로 추가"
+---
+
 # Task 1: Parser fallback
 
 > Ticket: OVDR-1234

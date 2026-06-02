@@ -21,6 +21,18 @@ Read-only review. Do not modify any files.
 ## Chesterton's Fence
 Before flagging code for removal or change, determine why it exists. If the reason is unclear, ask — do not assume it is safe to delete.
 
+## Intent consistency check (light, always)
+
+Before emitting findings, read the task file's frontmatter (`intent_problem` / `contributes_to`) and judge whether the diff actually contributes to that step. One-line verdict in `<intent_check>` (see Output format):
+
+- `yes` — diff clearly advances `contributes_to`. No further action.
+- `no` — diff does not advance `contributes_to` (off-topic / wrong file / wrong direction). Emit a `[p2]` issue with `description = "diff does not advance contributes_to: {contributes_to}"`.
+- `suspect` — partial / indirect / unclear. Emit a `[p3]` issue, leave decision to user.
+
+**Heavy version (risk-tagged tasks only)** — if the task file or plan.md `risk_areas:` flags this work as risk-tagged, also walk one level up: does the diff still serve `intent_problem`? If not, emit `[p1]`. Skip this step for non-risk tasks.
+
+Do not block on this alone — judgment goes into `<intent_check>` and (if `no` / `suspect`) into the issues list, but the existing status decision rules (p1/p2 routing) apply normally.
+
 ## Priority definitions
 
 | Code | Meaning | Routing |
@@ -61,6 +73,7 @@ ended_at: {ISO 8601 with timezone}
 ```xml
 <review>
   <status>approved | needs-fix</status>
+  <intent_check verdict="yes|no|suspect">{one-line reason — what the diff did vs contributes_to}</intent_check>
   <issues>
     <issue priority="p1|p2|p3|p4">
       <description>{what is wrong and where (file:line)}</description>

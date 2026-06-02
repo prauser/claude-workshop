@@ -113,12 +113,17 @@ PR 생성은 자동화하지 않는다 (plan.md Intentional Exclusions). 사용�
 1. **Decompose** — Feature-level tasks (not file-level). Order by dependencies. If plan.md was loaded (spec already approved), skip approval and proceed. Only ask for approval when no plan.md exists (free-text/no-arg path).
 2. **Write task files** — `.claude/tasks/pending/task-{N}-{name}.md`:
    - Task format follows `templates/workflow-contract/task.schema.md` exactly.
-   - Five required elements:
+   - Required elements:
      1. **자기완결성**: implementer가 이전 대화 없이 독립 실행 가능해야 함.
-     2. **사용자 원문 복사**: `plan.md` 최상단 YAML frontmatter의 `user_prompt` 값을 task 파일 §"사용자 최초 프롬프트 원문" 블록에 그대로 복사. 요약·정제 금지.
-     3. **AC = 실행 가능 bash**: §Acceptance Criteria는 zero exit = pass인 bash 커맨드로만 작성. 추상적 서술 금지.
-     4. **주의사항 X-Y 형식**: "X 하지 마라. 이유: Y" 형식. 이유 누락 시 무효.
-     5. **On completion**: result 파일 경로와 result.schema.md 링크 명시.
+     2. **YAML frontmatter telemetry 3종 채우기** (`task.schema.md` §YAML frontmatter 참조):
+        - `plan_sha` = `git hash-object .claude/plans/{TICKET}/plan.md` 결과 (working tree 의 blob SHA — tracking 무관, gitignored 레포에서도 동작).
+        - `intent_problem` = plan.md frontmatter `intent.problem` 값 verbatim.
+        - `contributes_to` = 본 task 가 plan.md `intent.approach` 의 어느 단계인지 한 줄. *impl 이 task 분해 시 자동 생성*.
+        - (참고) plan deviation 은 *런타임 발견* 만 추적 — implementer 가 result frontmatter `plan_deviations:` 에 append. pending task 에는 두지 않음.
+     3. **사용자 원문 복사**: `plan.md` 최상단 YAML frontmatter의 `user_prompt` 값을 task 파일 §"사용자 최초 프롬프트 원문" 블록에 그대로 복사. 요약·정제 금지.
+     4. **AC = 실행 가능 bash**: §Acceptance Criteria는 zero exit = pass인 bash 커맨드로만 작성. 추상적 서술 금지.
+     5. **주의사항 X-Y 형식**: "X 하지 마라. 이유: Y" 형식. 이유 누락 시 무효.
+     6. **On completion**: result 파일 경로와 result.schema.md 링크 명시.
 3. **Execute sequentially** — For each task:
    - Before delegating to `implementer`, prepend `templates/workflow-contract/preamble.md` content verbatim to the implementer prompt.
    - Delegate to `implementer` → then `reviewer`
@@ -177,6 +182,30 @@ reviewer 가 approved 를 반환한 직후, orchestrator(`/impl`)는 다음 2단
 - `test-engineer` — test strategy/coverage analysis (read-only, sonnet)
 
 reviewer output format SSOT: `claude-config/agents/reviewer.md` §Output format. impl routing consumes the priority tags from that schema directly.
+
+## Plan drift detection
+
+매 task 위임 직전 `git hash-object .claude/plans/{TICKET}/plan.md` 결과를 task frontmatter `plan_sha` 와 비교한다.
+
+- 일치 → 정상 진행.
+- 불일치 → plan.md 가 변경된 상태. orchestrator 는:
+  1. plan.md `intent_history` 마지막 엔트리를 읽어 무엇이 바뀌었는지 확인.
+  2. pending task 들의 `contributes_to` / `plan_sha` 를 새 plan 기준으로 갱신.
+  3. 사용자에게 한 줄 알림: "plan 이 갱신됨 ({field} 변경). 영향 task: N건. 이대로 진행?"
+  4. 사용자가 "OK" → 갱신 후 진행. "정지" → halt.
+
+`plan_deviations` 누적 → plan 으로 되돌릴 신호. 한 task 에서 3 건 이상 쌓이면 사용자에게 plan 갱신 권유 (강제 X).
+
+## PR body injection
+
+`/commit-push-pr` 호출 시 (별도 스킬) orchestrator 는 plan.md frontmatter 에서 다음을 추출해 PR body 에 박는다 (plan.md 본문은 push 하지 않음 — `.claude/*` gitignored 유지):
+
+- `intent` 블록 전체 (Problem / Approach / Why / PRD)
+- `gate_events` 요약 (각 gate 의 turns / result)
+- `skip_grill_count`
+- `risk_acks` 중 `needs_check` 항목 (있으면)
+
+이게 팀 가시성 채널. plan.md 본문은 로컬에만 남음.
 
 ## Rules
 - Never write code. Always delegate.
