@@ -120,6 +120,7 @@ PR 생성은 자동화하지 않는다 (plan.md Intentional Exclusions). 사용�
         - `intent_problem` = plan.md frontmatter `intent.problem` 값 verbatim.
         - `contributes_to` = 본 task 가 plan.md `intent.approach` 의 어느 단계인지 한 줄. *impl 이 task 분해 시 자동 생성*.
         - task 분해 시 CLAUDE.md `glossary_path` 가 있으면 task 본문 §사전 준비에 해당 GLOSSARY 경로를 자동 포함.
+        - task 위임 직전 GLOSSARY 파일 본문을 implementer 컨텍스트에 prepend (path 만 전달이 아닌 본문 자체).
         - (참고) plan deviation 은 *런타임 발견* 만 추적 — implementer 가 result frontmatter `plan_deviations:` 에 append. pending task 에는 두지 않음.
      3. **사용자 원문 복사**: `plan.md` 최상단 YAML frontmatter의 `user_prompt` 값을 task 파일 §"사용자 최초 프롬프트 원문" 블록에 그대로 복사. 요약·정제 금지.
      4. **AC = 실행 가능 bash**: §Acceptance Criteria는 zero exit = pass인 bash 커맨드로만 작성. 추상적 서술 금지.

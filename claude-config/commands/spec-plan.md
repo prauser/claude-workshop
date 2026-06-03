@@ -40,6 +40,9 @@ Planning only. Never write code or trigger implementation. All subagents are rea
 
    resolution 이 비어 있는 채로 진행한 비율은 우회 측정 지표. 사용자가 "그냥 진행" 답하면 resolution 생략하고 plan 계속.
 
+5. **GLOSSARY read** — CLAUDE.md `## Implementation Config` 의 `glossary_path:` 가 있으면 해당 파일을 읽고, 본 plan 세션 동안 §Authoring §9 우선순위 1번 (GLOSSARY hit) 에 사용한다.
+   - 없거나 파일이 존재하지 않으면 step 진행 (silent skip). 단, 첫 Gate 출력 시 한 줄 `GLOSSARY: 미설정` 로 표시.
+
 ## Authoring rules (apply to all Gate outputs)
 
 이 규칙들은 Gate 1 / 2 / 3 / Final Review 출력 *전부* 에 적용된다. 한 군데도 예외 없음.
@@ -52,6 +55,17 @@ Planning only. Never write code or trigger implementation. All subagents are rea
 6. **`file:line` 구체** — Impact Scope 의 "Files to modify" 는 추상명 ("the Weapon class") 금지. **`Source/Combat/Weapon.cpp:128`** 형태로, 가능하면 GitHub permalink markdown link 로 작성 (`[Source/Combat/Weapon.cpp:128](https://github.com/{org}/{repo}/blob/{SHA}/Source/Combat/Weapon.cpp#L128)`).
 7. **40 단어 이상 문장 분리** — 한 문장이 40 단어 넘으면 표 / 리스트로 재구성.
 8. **첫 등장 약어 한 줄 풀이** — CS / 도메인 약어가 plan.md 안에서 처음 등장할 때만 한 줄 풀이 추가. 같은 문서 내 재등장은 생략.
+9. **글로벌 순화 가이드 (SSOT)** — GLOSSARY > preamble §9 텍스트 instruction > LLM 자율 휴리스틱
+
+   본 출력(Gate 1 / 2 / 3 / Final Review 전부)에 등장하는 어휘는 아래 우선순위 순서로 처리한다.
+
+   1. **GLOSSARY 우선**: 본 출력에 등장하는 어휘는 *먼저* `glossary_path` (CLAUDE.md 의 키) 가 가리키는 GLOSSARY 에서 찾는다. hit 시 GLOSSARY 의 풀이/링크 사용.
+   2. **preamble §9 텍스트 instruction**: miss 시 `templates/workflow-contract/preamble.md` §9 텍스트 instruction (한글표기/주니어/자연 한글) 을 적용.
+   3. **LLM 자율 휴리스틱 + 슬롯 append**: instruction 으로도 자연 한글 대응이 없으면 LLM 자율 휴리스틱을 사용하고, result frontmatter `idiom_candidates:` 슬롯에 append 한다(`{term, ctx, ts}` 형태).
+
+   **§8 박스 비적용**: §8 의 `[!CAUTION]` 박스 내부(영역명·확인 항목)는 짧은 영어 키워드 보존이 가독성에 유리하므로 본 룰의 적용 대상이 아니다. preamble §9 와 동일.
+
+   **위임 시점**: Gate 1 / 2 / 3 / Final Review 출력 *모두* 에 적용. §Authoring rules 전체 prefix 와 정합.
 
 ## Approval response rules (Gate 2 / 3)
 
