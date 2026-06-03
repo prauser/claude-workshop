@@ -7,7 +7,7 @@ Planning only. Never write code or trigger implementation. All subagents are rea
 ## On activation
 
 1. Parse ticket ID from arguments.
-2. Read `## Implementation Config` from CLAUDE.md → get `specs_path`, `prd_path`, `policies_path`, `log_repo`.
+2. Read `## Implementation Config` from CLAUDE.md → get `specs_path`, `prd_path`, `policies_path`, `log_repo`, `glossary_path`.
    - No config: skip Spec Agent and Context Agent, run Jira + Code only.
 3. Capture `user_prompt`: the exact natural-language text the user typed when invoking `/spec-plan`. Do not summarize or paraphrase. If the invocation has no text beyond the ticket ID, ask once: "원문이 비었습니다 — 이 task를 시작하게 된 한 문장을 입력하세요." Record the response verbatim.
 4. **Readiness Check** — 입력(티켓 / `user_prompt` / PRD) 을 3등급 분류로 진단해 짧은 박스 리포트를 출력. Step 0 진입 *전에* 빵꾸를 발견하는 단계.
