@@ -45,6 +45,11 @@ Planning only. Never write code or trigger implementation. All subagents are rea
 
 6. **flag 파싱** — `--no-self-pass` opt-out flag. `--no-self-pass` 가 있으면 `self_pass = OFF`, 없으면 `self_pass = ON` (default ON). 본 세션 동안 유지.
 
+7. **idiom-pool 임계 알림** — `~/.claude/idiom-pool.yaml` 이 있으면 읽어 임계(term별 count ≥ 3) 이상이고 `status: open` 인 entries 가 있는지 확인. 있으면 첫 출력 직전 한 줄 알림:
+   `idiom-pool: N건 임계 (예: stale ×5, idempotent ×4). \`/idiom-review\` 권장.`
+   - 알림은 *정보성* — 자동 트리거 X (사용자가 명시 호출해야 실행됨).
+   - 파일 없음 또는 임계 항목 없음 → 조용히 skip.
+
 ## Authoring rules (apply to all Gate outputs)
 
 이 규칙들은 Gate 1 / 2 / 3 / Final Review 출력 *전부* 에 적용된다. 한 군데도 예외 없음.

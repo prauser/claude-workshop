@@ -37,6 +37,6 @@
 
    **룰 3 — 자연 한글 우선**: 한영 혼용(예: "이걸 deprecate 해야") 보다 한글 표기 + 괄호 영어(예: "이걸 폐기(deprecate) 해야")를 쓴다.
 
-   **룰 4 — `idiom_candidates:` 슬롯 + idiom-pool 카운터 룰**: 위 1-3 규칙을 *어쩔 수 없이* 어겼을 때(자연 한글 대응어가 없거나 confidence가 낮을 때) result frontmatter `idiom_candidates:` 슬롯에 한 줄 append한다(`{term, ctx, ts}`). 동시에 `~/.claude/idiom-pool.yaml`의 해당 term 카운터를 +1한다(스키마는 task-9에서 정의 — 본 룰은 카운터 +1 지침만).
+   **룰 4 — `idiom_candidates:` 슬롯 + idiom-pool 카운터 룰**: 위 1-3 규칙을 *어쩔 수 없이* 어겼을 때(자연 한글 대응어가 없거나 confidence가 낮을 때) result frontmatter `idiom_candidates:` 슬롯에 한 줄 append한다(`{term, ctx, ts}`). 동시에 `~/.claude/idiom-pool.yaml`의 해당 term 카운터를 +1한다(스키마: `claude-config/commands/idiom-review.md` §"Pool schema").
 
    **추가 룰 — 문장 길이·TBD 금지**: 한 문장이 ≥ 40 단어면 분리하거나 표/리스트로 재구성. "out of scope" / "not now" / "TBD" 단독 사용 금지 — 비용·위험·타이밍 중 하나의 근거를 붙인다.

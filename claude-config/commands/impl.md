@@ -87,6 +87,11 @@ cost / latency 측정은 `runs/{TICKET}/manifest.yaml` 의 model / runner 필드
    - `test-output.log` — command and quality gate evidence
    - `manifest.yaml` — final run manifest written by the integrator
 
+5. **idiom-pool 임계 알림** — `~/.claude/idiom-pool.yaml` 이 있으면 읽어 임계(term별 count ≥ 3) 이상이고 `status: open` 인 entries 가 있는지 확인. 있으면 첫 출력 직전 한 줄 알림:
+   `idiom-pool: N건 임계 (예: stale ×5, idempotent ×4). \`/idiom-review\` 권장.`
+   - 알림은 *정보성* — 자동 트리거 X (사용자가 명시 호출해야 실행됨).
+   - 파일 없음 또는 임계 항목 없음 → 조용히 skip.
+
 ## Branch policy
 
 `/impl` 진입 시 현재 브랜치를 확인한다.
