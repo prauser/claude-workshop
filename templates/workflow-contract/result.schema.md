@@ -19,6 +19,7 @@ started_at: 2026-04-27T10:00:00+09:00
 ended_at: 2026-04-27T10:20:00+09:00
 risk_acks: []          # Optional. preamble.md §8 위험영역 ack 결과. 비어 있으면 생략 가능.
 plan_deviations: []    # Optional. 런타임에 plan 에 없는 결정이 발생했을 때 append. 각 {ts, note}. 비어 있으면 생략.
+idiom_candidates: []   # Optional. preamble.md §9 텍스트 instruction 이 풀이 없이 영어 어휘를 쓸 때 append. 비어 있으면 생략 가능.
 ---
 ```
 
@@ -42,6 +43,7 @@ Fields:
 - `ended_at`: ISO 8601 timestamp.
 - `risk_acks` (optional): preamble.md §8 위험영역에 닿았을 때 implementer/integrator 가 append. 각 항목 `{area, ack: confirmed|needs_check, ts}`. `area` 는 baseline 5 종 slug enum 중 하나 (`memory` / `replication` / `concurrency` / `architecture` / `build-deploy`) 또는 plan.md `risk_areas:` 에 선언된 +α slug. `needs_check` 가 하나라도 있으면 result `status` 를 `partial` 로 내리고 사용자 확인을 받아야 한다. 비어 있거나 영역에 안 닿으면 필드 자체 생략.
 - `plan_deviations` (optional): 런타임에 plan 에 없는 결정이 발생하면 implementer / integrator 가 한 줄 append. 각 `{ts, note}`. reviewer 의 `<intent_check>` 가 참조. 한 task 에서 3 건 이상 누적되면 orchestrator 가 plan 갱신 권유 (강제 X). 비어 있으면 필드 생략.
+- `idiom_candidates` (optional): preamble.md §9 룰(한글표기/주니어 가정/자연 한글 우선)을 *어쩔 수 없이* 어겼을 때 implementer / reviewer / integrator 가 append. 각 항목 스키마: `{term: <영어 어휘>, ctx: <짧은 사용 맥락 1줄>, ts: <ISO 8601>}`. append 시 `~/.claude/idiom-pool.yaml` 의 해당 term 카운터를 +1 한다(스키마는 task-9 / `idiom-pool.yaml` SSOT — 본 슬롯은 데이터 경로만). §9 룰을 어기지 않았거나 비어 있으면 필드 자체 생략.
 
 Rules:
 
