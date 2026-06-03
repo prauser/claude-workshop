@@ -2,7 +2,7 @@
 
 Planning only. Never write code or trigger implementation. All subagents are read-only.
 
-**Usage**: `/spec-plan {TICKET}`
+**Usage**: `/spec-plan {TICKET} [--no-self-pass]`
 
 ## On activation
 
@@ -43,6 +43,8 @@ Planning only. Never write code or trigger implementation. All subagents are rea
 5. **GLOSSARY read** — CLAUDE.md `## Implementation Config` 의 `glossary_path:` 가 있으면 해당 파일을 읽고, 본 plan 세션 동안 §Authoring §9 우선순위 1번 (GLOSSARY hit) 에 사용한다.
    - 없거나 파일이 존재하지 않으면 step 진행 (silent skip). 단, 첫 Gate 출력 시 한 줄 `GLOSSARY: 미설정` 로 표시.
 
+6. **flag 파싱** — `--no-self-pass` opt-out flag. `--no-self-pass` 가 있으면 `self_pass = OFF`, 없으면 `self_pass = ON` (default ON). 본 세션 동안 유지.
+
 ## Authoring rules (apply to all Gate outputs)
 
 이 규칙들은 Gate 1 / 2 / 3 / Final Review 출력 *전부* 에 적용된다. 한 군데도 예외 없음.
@@ -77,13 +79,27 @@ Gate 2 / 3 의 사용자 승인은 *형식* 도 검증한다. 우회 패턴 차�
 - **Gate 1 (Requirements) 은 예외** — 한 단어 OK 허용 (Gate 1 은 *의도* 승인이지 기술 리뷰가 아님).
 - **`skip_grill_count` 카운터** — 사용자가 *명시적* skip 요청(예: `--skip-grill`, "건너뛰기", "grill 빼고") 또는 §Gate 2 "건너뛰기" 단축경로를 쓸 때만 plan.md frontmatter `skip_grill_count` 를 1 증가. 일반 "일괄 결정"(각 Ambiguity 에 explicit 응답을 모아 한 번에)은 정상 흐름이므로 카운트 X. PR 본문 주입 시 같이 노출.
 
+## Self-pass turn
+
+매 Gate (1 / 2 / 3 / Final) 출력 직후, `self_pass` 가 ON 이면 *internal* 한 턴을 추가로 돌린다. 사용자에게 노출되지 않는 reasoning.
+
+**내부 turn 의 체크 항목:**
+
+1. `preamble.md` §9 텍스트 instruction (한글표기 / 주니어 가정 / 자연 한글) 위반 어휘 검색.
+2. spec-plan Authoring §9 우선순위 (GLOSSARY > preamble §9 텍스트 instruction > LLM 자율 휴리스틱) 적용 여부.
+3. 위반 발견 시 revised 출력을 *사용자에게 노출되는 turn* 으로 다시 내보낸다. revised 가 unchanged 이면 그대로 진행 (no-op).
+
+`self_pass = OFF` 면 step 전체 skip.
+
 ## Gate event recording
 
 매 게이트 (1 / 2 / 3) 가 종료(OK / revise / skip)할 때마다 plan.md frontmatter `gate_events:` 에 한 줄 append:
 
 ```yaml
-- {gate: 2, result: ok|revise|skip, turns: <int>, ts: <ISO 8601>}
+- {gate: 2, result: ok|revise|skip, turns: <int>, self_pass: <bool>, ts: <ISO 8601>}
 ```
+
+`self_pass`: 본 gate 의 출력 직후 self-pass turn 이 발동했는지 (ON + revised or unchanged) / OFF 면 false.
 
 **`turns` 정의**: gate 첫 출력부터 최종 OK 까지의 **사용자 응답 메시지 수** (AI 출력 카운트 X, revise 응답 포함). 예: AI 출력 → "ok" 거부 → "맞다 X" = turns 2.
 
@@ -352,8 +368,8 @@ risk_areas: []        # +α slug 만 (baseline 5종 — memory/replication/concu
 docs_cited: [ADR-014, CONV-007]   # omit 가능 — yaml docs 없을 때는 필드 자체 제거 (빈 배열 emit 금지)
 readiness_flags: []   # Readiness Check 의 "이상" 등급 항목. 각 {flag, detail, resolution, ts}. resolution 없으면 미해결 진행.
 skip_grill_count: 0   # 명시적 skip 요청 시에만 +1 (Approval response rules)
-gate_events:          # 게이트 별 결과 자동 기록. {gate, result, turns, ts}. turns = 사용자 응답 메시지 수.
-  - {gate: 1, result: ok, turns: 1, ts: ...}
+gate_events:          # 게이트 별 결과 자동 기록. {gate, result, turns, self_pass, ts}. turns = 사용자 응답 메시지 수.
+  - {gate: 1, result: ok, turns: 1, self_pass: true, ts: ...}
 intent_history: []    # intent.{problem,approach,why} 변경 이력. append-only. 각 {ts, field, prev_value, reason}. prev_value = 변경 전 텍스트 그대로 (hash 아님).
 risk_acks: []         # [!CAUTION] ack 결과. 각 {area, ack: confirmed|needs_check, ts}. area = baseline slug 또는 risk_areas: 의 +α slug.
 ---
