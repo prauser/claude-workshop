@@ -50,6 +50,8 @@ Planning only. Never write code or trigger implementation. All subagents are rea
    - 알림은 *정보성* — 자동 트리거 X (사용자가 명시 호출해야 실행됨).
    - 파일 없음 또는 임계 항목 없음 → 조용히 skip.
 
+**게이트 실행 순서**: Step 0 (Context gathering) → **Gate 0** (align, 의도 정렬) → Gate 1 (Requirements) → Gate 2 (Plan + Ambiguities) → Gate 3 (Test Strategy) → Step 2 (Cross-review) → Final Review → Step 4 (Save plan).
+
 ## Authoring rules (apply to all Gate outputs)
 
 이 규칙들은 Gate 1 / 2 / 3 / Final Review 출력 *전부* 에 적용된다. 한 군데도 예외 없음.
@@ -74,14 +76,21 @@ Planning only. Never write code or trigger implementation. All subagents are rea
 
    **위임 시점**: Gate 1 / 2 / 3 / Final Review 출력 *모두* 에 적용. §Authoring rules 전체 prefix 와 정합.
 
-## Approval response rules (Gate 2 / 3)
+## Approval response rules (Gate 0 / 1 / 2 / 3)
 
-Gate 2 / 3 의 사용자 승인은 *형식* 도 검증한다. 우회 패턴 차단.
+각 게이트의 사용자 승인은 *형식* 도 검증한다. 우회 패턴 차단.
 
-- **한 단어 OK 거부**: "ok" / "go" / "네" 단독 응답은 Gate 2 / 3 에서 거부하고 재질문. 사용자는 다음 둘 중 하나 형태로 응답해야 한다:
+승인 형식 계층 (낮은 → 높은 기준):
+
+| 게이트 | 허용 형식 | 비고 |
+|---|---|---|
+| **Gate 1** (Requirements) | 한 단어 OK (`"OK"`, `"진행해"`) | 의도 승인이지 기술 리뷰가 아님 |
+| **Gate 0** (align) | `"맞다"` + 무엇이 맞는지 **한 줄** | bare OK 불가. 예: "맞다. 문제 정의 정확함" |
+| **Gate 2 / 3** | `"맞다"` + 무엇이 맞는지 한 줄 **+ 근거** | 한 단어 OK 거부, 재질문 |
+
+- **Gate 2 / 3 한 단어 OK 거부**: "ok" / "go" / "네" 단독 응답은 거부하고 재질문. 사용자는 다음 둘 중 하나 형태로 응답해야 한다:
   - `"맞다"` + 무엇이 맞는지 한 줄 (예: "맞다. Impact Scope 의 3개 파일 정확함")
   - `"틀린 곳: ..."` + 어디가 틀렸는지
-- **Gate 1 (Requirements) 은 예외** — 한 단어 OK 허용 (Gate 1 은 *의도* 승인이지 기술 리뷰가 아님).
 - **`skip_grill_count` 카운터** — 사용자가 *명시적* skip 요청(예: `--skip-grill`, "건너뛰기", "grill 빼고") 또는 §Gate 2 "건너뛰기" 단축경로를 쓸 때만 plan.md frontmatter `skip_grill_count` 를 1 증가. 일반 "일괄 결정"(각 Ambiguity 에 explicit 응답을 모아 한 번에)은 정상 흐름이므로 카운트 X. PR 본문 주입 시 같이 노출.
 
 ## Self-pass turn
@@ -98,13 +107,17 @@ Gate 2 / 3 의 사용자 승인은 *형식* 도 검증한다. 우회 패턴 차�
 
 ## Gate event recording
 
-매 게이트 (1 / 2 / 3) 가 종료(OK / revise / skip)할 때마다 plan.md frontmatter `gate_events:` 에 한 줄 append:
+매 게이트 (0 / 1 / 2 / 3) 가 종료(OK / revise / skip)할 때마다 plan.md frontmatter `gate_events:` 에 한 줄 append:
 
 ```yaml
+- {gate: 0, result: ok|revise|skip, turns: <int>, self_pass: <bool>, ts: <ISO 8601>}
 - {gate: 2, result: ok|revise|skip, turns: <int>, self_pass: <bool>, ts: <ISO 8601>}
 ```
 
+`gate` 필드 허용 값: `0` (align), `1` (Requirements), `2` (Plan + Ambiguities), `3` (Test Strategy).
+
 `self_pass`: 본 gate 의 출력 직후 self-pass turn 이 발동했는지 (ON + revised or unchanged) / OFF 면 false.
+Gate 0 (align) 는 light gate 이므로 self-pass 는 "생략 가능" — 미결(Open Question).
 
 **`turns` 정의**: gate 첫 출력부터 최종 OK 까지의 **사용자 응답 메시지 수** (AI 출력 카운트 X, revise 응답 포함). 예: AI 출력 → "ok" 거부 → "맞다 X" = turns 2.
 
@@ -205,6 +218,59 @@ Spawn 5 read-only subagents in parallel:
 - Return: related knowledge, past learnings
 
 **[Test Agent]** (sonnet) — spawn `test-engineer` in Strategy mode; return its `<test-plan>` output
+
+## Gate 0 — Align (의도 정렬)
+
+> **실행 위치**: Step 0 완료 직후, Gate 1 진입 직전.
+> **강도**: light — 1~2질문으로 짧게 닫는다. 수렴되면 바로 Gate 1로 진행.
+
+### Gate 0 목적
+
+`user_prompt`·`intent.problem`의 "문제 한 줄"과 Step 0 탐색 결과를 대조해 사용자 의도와 AI 이해가 일치하는지 확인한다. 어긋남이 있으면 짧은 정렬 대화를 거쳐 일치를 확정받는다. 복잡하면 grill 엔진으로 자연 승격.
+
+### Gate 0 실행
+
+grill 엔진을 `align` mode로 호출한다 (SSOT: `templates/workflow-contract/grill.md` §2.1, §4):
+
+```
+grill(
+  mode:   align
+  seed:   "문제 한 줄 ↔ Step 0 findings"
+  cap:    small (light gate — 1~2웨이브)
+  output: intent_history
+)
+→ 수렴 시: 일치 확인 기록.
+  사용자가 직접 확정한 경우에만 intent_history += {ts, field: problem, prev_value, reason}
+→ 미수렴 시: 호출자 자체 판단 (readiness_flags에 기록 권장)
+```
+
+**diff 노출**: "당신 문제 한 줄 ↔ 내가 찾은 것"을 대조해 어긋남이 있으면 짧은 정렬 대화를 먼저 시도. 어긋남이 없으면 바로 Gate 1로 진행.
+
+### intent.problem 갱신 경로 (3조건 — 모두 충족해야 갱신 가능)
+
+Gate 0 대화 중 문제 한 줄을 바꿔야 하는 경우:
+
+1. **(명시적 확정)** 사용자가 "문제 한 줄을 X로" 직접 확정한 경우에만 갱신한다.
+2. **(기록 강제)** `intent_history`에 `{ts, field: problem, prev_value: <원문 그대로>, reason}` 항목을 추가한다. 변경 전 텍스트를 verbatim(원문 그대로)으로 보존한다.
+3. **(AI 단독 변경 금지)** diff를 사용자에게 제시할 수만 있고, 사용자 확정 없이는 갱신 불가.
+
+> **verbatim 원칙**: "verbatim"은 AI가 조용히 의역 못 한다는 뜻이지 영원히 동결이 아니다. 사용자가 직접 확정하면 갱신할 수 있다.
+
+### Gate 0 승인 형식
+
+승인 형식: `"맞다"` + 무엇이 맞는지 **한 줄**. bare OK 불가.
+
+> 형식 계층: Gate 1 (bare OK) < Gate 0 (맞다+한줄) < Gate 2/3 (맞다+근거)
+
+### Gate 0 기록
+
+Gate 0 종료 시 `gate_events:`에 한 줄 append:
+```yaml
+- {gate: 0, result: ok|revise|skip, turns: <int>, self_pass: <bool>, ts: <ISO 8601>}
+```
+self_pass: Gate 0 는 light gate 이므로 생략 가능 (미결 — Open Question).
+
+---
 
 ## Gate 1 — Requirements
 
@@ -373,7 +439,8 @@ risk_areas: []        # +α slug 만 (baseline 5종 — memory/replication/concu
 docs_cited: [ADR-014, CONV-007]   # omit 가능 — yaml docs 없을 때는 필드 자체 제거 (빈 배열 emit 금지)
 readiness_flags: []   # Readiness Check 의 "이상" 등급 항목. 각 {flag, detail, resolution, ts}. resolution 없으면 미해결 진행.
 skip_grill_count: 0   # 명시적 skip 요청 시에만 +1 (Approval response rules)
-gate_events:          # 게이트 별 결과 자동 기록. {gate, result, turns, self_pass, ts}. turns = 사용자 응답 메시지 수.
+gate_events:          # 게이트 별 결과 자동 기록. {gate, result, turns, self_pass, ts}. turns = 사용자 응답 메시지 수. gate 허용값: 0(align)/1/2/3.
+  - {gate: 0, result: ok, turns: 1, self_pass: false, ts: ...}
   - {gate: 1, result: ok, turns: 1, self_pass: true, ts: ...}
 intent_history: []    # intent.{problem,approach,why} 변경 이력. append-only. 각 {ts, field, prev_value, reason}. prev_value = 변경 전 텍스트 그대로 (hash 아님).
 risk_acks: []         # [!CAUTION] ack 결과. 각 {area, ack: confirmed|needs_check, ts}. area = baseline slug 또는 risk_areas: 의 +α slug.
