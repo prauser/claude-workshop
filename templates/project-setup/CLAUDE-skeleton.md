@@ -2,6 +2,7 @@
 ## Implementation Config
 specs_path: docs/specs
 prd_path: docs/prd
+glossary_path: docs/glossary.md
 guidelines:
 {{GUIDELINES_LIST}}
 
