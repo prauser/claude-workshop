@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>워크플로우 테스트 & 피드백 — Spec → Impl → Review</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg:#fafafa; --panel:#fff; --fg:#1f2328; --muted:#6b7280;
+    --accent:#2563eb; --accent-soft:#eff6ff; --border:#e5e7eb;
+    --code:#f3f4f6; --ok:#10b981; --warn:#d97706; --danger:#dc2626;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Pretendard","Noto Sans KR",sans-serif;
+    background:var(--bg); color:var(--fg); line-height:1.6;
+    min-height:100vh; display:flex; flex-direction:column;
+  }
+  header.app{background:var(--panel);border-bottom:1px solid var(--border);padding:14px 24px;position:sticky;top:0;z-index:10}
+  header.app .row{max-width:1200px;margin:0 auto;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  header.app h1{font-size:16px;margin:0;font-weight:700}
+  header.app .lead{font-size:13px;color:var(--muted);margin-left:auto}
+  nav.tabs{background:var(--panel);border-bottom:1px solid var(--border);padding:0 24px;position:sticky;top:48px;z-index:9;overflow-x:auto}
+  nav.tabs ul{list-style:none;margin:0;padding:0;display:flex;gap:4px;max-width:1200px;margin:0 auto}
+  nav.tabs li{flex:0 0 auto}
+  nav.tabs button{background:none;border:none;padding:12px 16px;cursor:pointer;font-size:14px;color:var(--muted);font-weight:500;border-bottom:2px solid transparent;font-family:inherit}
+  nav.tabs button:hover{color:var(--fg)}
+  nav.tabs button.active{color:var(--accent);border-bottom-color:var(--accent)}
+  main{flex:1;max-width:1200px;margin:0 auto;padding:32px 24px;width:100%}
+  .panel{display:none}
+  .panel.active{display:block;animation:fade .25s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  h2{font-size:22px;margin:0 0 8px}
+  h3{font-size:16px;margin:24px 0 10px}
+  p,ul,ol{margin:10px 0}
+  ul,ol{padding-left:22px}
+  code{background:var(--code);padding:1px 6px;border-radius:4px;font-size:0.9em;font-family:"SF Mono",Menlo,monospace}
+  pre{background:#1f2328;color:#e6edf3;padding:14px;border-radius:8px;overflow-x:auto;font-size:13px}
+  pre code{background:none;padding:0;color:inherit}
+  table{border-collapse:collapse;width:100%;margin:14px 0;font-size:14px;background:var(--panel)}
+  th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+  th{background:var(--accent-soft);font-weight:600}
+  blockquote{margin:12px 0;padding:10px 16px;border-left:4px solid var(--accent);background:var(--accent-soft);border-radius:0 6px 6px 0}
+  .callout{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px 16px;margin:16px 0;font-size:14px}
+  .lead-p{font-size:15px;color:var(--muted)}
+
+  /* ── Step scenario ─────────────────── */
+  .steps{display:flex;flex-direction:column;gap:14px;margin:18px 0}
+  .step{display:grid;grid-template-columns:48px 1fr;gap:14px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 18px}
+  .step-num{font-size:22px;font-weight:700;color:var(--accent);text-align:center}
+  .step h4{margin:0 0 6px;font-size:15px}
+  .step p{margin:4px 0;font-size:14px;color:var(--fg)}
+  .step code{font-size:0.85em}
+
+  /* ── Checklist ─────────────────── */
+  .scenario-picker{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0 20px}
+  .scenario-picker button{
+    background:var(--panel);border:1px solid var(--border);border-radius:18px;
+    padding:6px 14px;cursor:pointer;font-size:13px;color:var(--muted);font-family:inherit;
+    transition:.15s;
+  }
+  .scenario-picker button:hover{border-color:var(--accent);color:var(--accent)}
+  .scenario-picker button.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+  .check-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px 22px;margin:12px 0}
+  .check-card h4{margin:0 0 4px;font-size:16px;display:flex;align-items:center;gap:8px}
+  .check-card .star{color:var(--danger);font-size:13px}
+  .check-card .hint{font-size:13px;color:var(--muted);margin:0 0 12px}
+  .check-list{list-style:none;padding:0;margin:0}
+  .check-list li{display:flex;gap:10px;padding:8px 0;align-items:flex-start;border-bottom:1px dashed var(--border)}
+  .check-list li:last-child{border-bottom:none}
+  .check-list input[type=checkbox]{margin-top:5px;width:16px;height:16px;cursor:pointer;flex-shrink:0;accent-color:var(--accent)}
+  .check-list label{flex:1;cursor:pointer;font-size:14px}
+  .check-list input:checked + label{color:var(--muted);text-decoration:line-through}
+  .progress{
+    height:6px;background:var(--code);border-radius:3px;overflow:hidden;margin-top:10px;
+  }
+  .progress > div{height:100%;background:var(--ok);transition:width .25s}
+  .meta-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--muted);margin-top:8px}
+  .reset-btn{background:none;border:1px solid var(--border);border-radius:4px;padding:3px 10px;font-size:11px;color:var(--muted);cursor:pointer;font-family:inherit}
+  .reset-btn:hover{color:var(--danger);border-color:var(--danger)}
+
+  /* feedback patterns */
+  .feedback-table{font-size:13px}
+  .feedback-table code{display:inline-block}
+
+  /* FAQ */
+  details.faq{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:12px 18px;margin:10px 0;transition:.15s}
+  details.faq[open]{box-shadow:0 4px 14px rgba(0,0,0,.05)}
+  details.faq summary{cursor:pointer;font-weight:600;font-size:14px;list-style:none;display:flex;align-items:center;gap:10px}
+  details.faq summary::-webkit-details-marker{display:none}
+  details.faq summary::before{content:"+";color:var(--accent);font-weight:700;width:18px;display:inline-block}
+  details.faq[open] summary::before{content:"−"}
+  details.faq summary:hover{color:var(--accent)}
+  details.faq[open] > *:not(summary){margin-top:10px}
+  details.faq p, details.faq ul{font-size:14px;color:var(--fg)}
+
+  @media (max-width:720px){
+    nav.tabs button{padding:10px 10px;font-size:13px}
+    main{padding:20px 14px}
+    .step{grid-template-columns:1fr}
+    .step-num{text-align:left}
+  }
+</style>
+</head>
+<body>
+
+<header class="app">
+  <div class="row">
+    <h1>워크플로우 테스트 & 피드백</h1>
+    <span class="lead">실제로 돌려보고 게이트를 지키는 법</span>
+  </div>
+</header>
+
+<nav class="tabs">
+  <ul id="tablist">
+    <li><button data-tab="first" class="active">1. 첫 시도</button></li>
+    <li><button data-tab="check">2. 페이즈 체크리스트</button></li>
+    <li><button data-tab="faq">3. FAQ</button></li>
+  </ul>
+</nav>
+
+<main>
+
+<!-- ─── 1. First scenario ─── -->
+<section class="panel active" id="panel-first">
+  <h2>첫 시도 권장 시나리오</h2>
+  <p class="lead-p">처음 워크플로우를 시험해 본다면 다음 순서로. 각 스텝은 다음을 학습하기 위해 설계되어 있다.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div>
+        <h4>작은 티켓으로 시작</h4>
+        <p>XS~M 한 개 규모로. 거대 epic은 피하기 — 첫 시도에서 워크플로우의 형태를 느끼는 게 목적이지, 실제 큰 작업을 끝내는 게 아니다.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div>
+        <h4><code>/spec-plan {TICKET}</code> 호출 — 3 Gate 모두 분리해서 경험</h4>
+        <p><code>"건너뛰기"</code>를 쓰지 말 것. 각 Gate가 어떤 정보를 만들어내는지 분리해서 봐야 의도가 보인다.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div>
+        <h4>각 Gate에서 일부러 <code>"수정"</code> 한 번씩</h4>
+        <p>피드백 루프 체감용. "OK" 한 번에 통과시키지 말고, 하나 정도 수정 지시를 줘서 어떻게 반영되는지 본다.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div>
+        <h4><code>/impl {TICKET}</code> — 첫 task에서 reviewer 핑퐁 한 번 보기</h4>
+        <p>의도적으로 작은 결함을 두는 것도 학습 효과. p1/p2 라우팅이 실제로 어떻게 되는지 직접 보면 priority 체계가 와닿는다.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">5</div>
+      <div>
+        <h4>완료 후 artifact를 천천히 다시 읽기</h4>
+        <p><code>.claude/runs/{TICKET}/manifest.yaml</code> · <code>plan.md</code> · 각 <code>task-N-*.md</code> · <code>*-result.md</code>. <strong>artifact가 어떻게 결정의 추적 가능성을 만드는지</strong> — 이게 이 워크플로우의 진짜 가치.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>개선 아이디어는 기록</strong> — 문제 발견·개선 아이디어는 <code>notes/impl-workflow/future-ideas.md</code>에 적어두면 다음 iteration에 반영.
+  </div>
+</section>
+
+<!-- ─── 2. Checklist ─── -->
+<section class="panel" id="panel-check">
+  <h2>사람이 개입하는 페이즈 — 체크리스트</h2>
+  <blockquote>이 워크플로우는 <strong>사람이 게이트를 지키지 않으면 가치가 절반</strong>이다. 어느 페이즈에서 무엇을 확인할지 미리.</blockquote>
+
+  <p class="lead-p">시나리오를 선택하면 그 페이즈에서 확인할 항목만 보입니다. 체크 상태는 브라우저에 저장됩니다.</p>
+
+  <div class="scenario-picker" id="scenario-picker">
+    <button class="active" data-s="g1">Gate 1 · Requirements ★</button>
+    <button data-s="g2">Gate 2 · Plan + Ambiguities</button>
+    <button data-s="g3">Gate 3 · Test Strategy</button>
+    <button data-s="final">Final Review</button>
+    <button data-s="impl">/impl 중 — reviewer 결과</button>
+    <button data-s="failed">/impl 중 — task 실패</button>
+    <button data-s="integ">Integrator 보고 직후</button>
+    <button data-s="pr">PR 단계</button>
+  </div>
+
+  <div id="check-container"></div>
+
+  <div class="meta-row">
+    <span id="global-progress">전체 진행: 0 / 0</span>
+    <button class="reset-btn" id="reset-all">전체 초기화</button>
+  </div>
+</section>
+
+<!-- ─── 3. FAQ ─── -->
+<section class="panel" id="panel-faq">
+  <h2>자주 묻는 질문 (FAQ)</h2>
+
+  <details class="faq">
+    <summary><code>/spec-plan</code> 없이 바로 <code>/impl</code> 써도 되나?</summary>
+    <p>가능 (자유 텍스트 모드). 단 task 분해 품질이 떨어지고 reviewer 핑퐁이 늘어남. <strong>첫 도입 1~2주는 무조건 <code>/spec-plan</code> 거치는 걸 권장</strong>.</p>
+  </details>
+
+  <details class="faq">
+    <summary>Plan을 수정하고 싶다.</summary>
+    <p><code>/spec-plan {TICKET}</code> 재호출하면 <code>plan-v2.md</code>로 저장됨. 활성 revision은 <code>manifest.yaml</code>에 기록.</p>
+  </details>
+
+  <details class="faq">
+    <summary>Reviewer가 너무 깐깐하다.</summary>
+    <p>p1/p2가 진짜 필요한지 case-by-case로 판단. <code>[p2] X는 defer</code> 라고 명시하면 통과. 패턴이 반복되면 <code>claude-config/agents/reviewer.md</code>의 priority 정의를 팀 컨벤션에 맞게 조정.</p>
+  </details>
+
+  <details class="faq">
+    <summary>어떤 작업에는 안 맞나?</summary>
+    <ul>
+      <li><strong>단순 hot-fix / 1-line 변경</strong> — overhead가 더 큼. 그냥 수정 후 commit.</li>
+      <li><strong>탐색적 디버깅</strong> — <code>/impl</code>의 <code>analyzer</code> / <code>debugger</code> 경로를 쓰거나, 그냥 일반 대화로.</li>
+      <li><strong>UI 폴리싱 / 디자인 iteration</strong> — visual 피드백 루프가 우선. <code>/spec-plan</code> overkill.</li>
+    </ul>
+  </details>
+
+  <details class="faq">
+    <summary><code>templates/workflow-contract/</code> 파일들은 뭔가?</summary>
+    <p>모든 artifact 형식의 SSOT (Single Source of Truth). 새 runner를 추가해도 이 contract만 따르면 동일한 audit이 가능. <code>contract.md</code>부터 읽으면 됨.</p>
+  </details>
+
+  <details class="faq">
+    <summary>Open Questions와 Ambiguities는 무엇이 다른가?</summary>
+    <ul>
+      <li><strong>Open Questions</strong> — "구현 중에 결정해도 됨". Gate 1에 노출되지만 통과 막지 않음.</li>
+      <li><strong>Ambiguities</strong> — "지금 결정 안 하면 task 분해가 무너짐". <strong>모든 항목 해소 전 Gate 2 통과 불가</strong>.</li>
+    </ul>
+  </details>
+
+  <details class="faq">
+    <summary>Runner 옵션은 언제 바꾸나?</summary>
+    <p>처음에는 <strong>기본값(in-session) 그대로</strong>. 비용이 부담되거나 큰 batch를 돌릴 때 <code>--preset cost-optimized</code>로 implementer만 headless-codex로 빼는 것이 일반적. 품질 차이를 체감하려면 같은 task를 두 번 돌려 manifest.yaml의 runner/model 필드를 비교해 보면 됨.</p>
+  </details>
+
+  <details class="faq">
+    <summary>커밋이 자동으로 push되지 않는다.</summary>
+    <p>의도된 설계. orchestrator는 로컬 커밋만 만들고 push·PR 생성은 사용자가 수동으로. 마지막 사람 확인 기회를 보장하기 위해서.</p>
+  </details>
+
+  <blockquote style="margin-top:24px">개념·구조 설명은 <a href="workflow-concepts.html"><strong>workflow-concepts.html</strong></a> 로.</blockquote>
+</section>
+
+</main>
+
+<script>
+(() => {
+  // ── tabs ───────────────────────────────
+  const tabs = document.querySelectorAll('#tablist button');
+  const panels = document.querySelectorAll('.panel');
+  const setTab = (id) => {
+    tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === id));
+    panels.forEach(p => p.classList.toggle('active', p.id === 'panel-' + id));
+    history.replaceState(null, '', '#' + id);
+    window.scrollTo({top: 0, behavior:'smooth'});
+  };
+  tabs.forEach(t => t.addEventListener('click', () => setTab(t.dataset.tab)));
+  const initial = (location.hash || '#first').slice(1);
+  if (document.getElementById('panel-' + initial)) setTab(initial);
+
+  // ── checklists ─────────────────────────
+  const STORAGE_KEY = 'workflow-onboarding-checks-v1';
+  const load = () => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { return {}; } };
+  const save = (s) => localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+
+  const SCENARIOS = {
+    g1: {
+      title: 'Gate 1 — Requirements',
+      star: '가장 중요',
+      hint: '뒤에 모든 작업이 P0/P1 분류와 Intentional Exclusions 위에 쌓인다. 여기서 잘못 잠그면 task가 만들어진 뒤 회복이 어렵다.',
+      items: [
+        'P0/P1 경계가 합리적인가? "전부 P0"이라는 결과가 나오면 의심.',
+        'Intentional Exclusions의 이유가 동어반복은 아닌가? ("우선순위 낮음", "out of scope"는 무효 — 비용/위험/타이밍 중 하나로 명시)',
+        '도메인 관점에서 누락된 P0가 없는가? 마지막 안전망은 사람.',
+        'Open Questions가 정말 구현 중 결정 가능한가? 아니면 Ambiguities로 옮겨야 하나?',
+      ],
+      feedback: [
+        ['<code>"수정"</code>', '같은 Gate 내에서 다시 작성'],
+        ['<code>"P0의 X를 Intentional Exclusions로"</code>', '재분류'],
+        ['<code>"OK"</code>', '다음 Gate로'],
+      ],
+    },
+    g2: {
+      title: 'Gate 2 — Plan + Ambiguities',
+      hint: 'Task 분해가 만들어지는 단계. 의존성과 Impact Scope의 정확도가 implementer 단계의 효율을 좌우.',
+      items: [
+        'Task 사이즈가 합리적인가? 모두 XL이면 분해 부족, 모두 XS면 over-decomposition.',
+        '의존성 순서가 정확한가? task N이 task N-1의 산출물을 쓰는가?',
+        'Ambiguities를 모두 결정했는가? 미결 항목 있으면 절대 Gate 3로 진행 금지.',
+        'Impact Scope의 파일 리스트가 실제 만질 영역과 일치하는가? (누락 시 reviewer 단계에서 "선언 외 파일 수정" 경고로 시간 낭비)',
+      ],
+    },
+    g3: {
+      title: 'Gate 3 — Test Strategy',
+      hint: '테스트가 측정 가능한 형태인지 점검. integrator는 여기 적힌 Quality Gates만 본다.',
+      items: [
+        'Risk areas가 실제 위험과 매칭되는가?',
+        'Quality Gates 체크리스트가 명확히 측정 가능한가? ("잘 동작" X · "테스트 통과" O)',
+        '수동 테스트가 필요한 부분은 별도로 메모해 두기 — integrator도 자동 테스트만 본다.',
+      ],
+    },
+    final: {
+      title: 'Final Review',
+      hint: 'Cross-review가 잡지 못한 모순을 마지막으로 거른다.',
+      items: [
+        '전체 그림에서 모순이 없는가?',
+        '<code>plan.md</code>의 <code>user_prompt</code>가 실제 의도와 일치하는가? (이후 모든 task가 이걸 인용함)',
+      ],
+    },
+    impl: {
+      title: '/impl 중 — task별 reviewer 결과',
+      hint: 'reviewer가 매 task마다 결과를 보고. 다음 케이스에 사람이 개입한다.',
+      items: [
+        '<code>[p1]</code>이 3 round 끝에도 남음 → 컨텍스트 부족·스펙 누락 가능성. <code>plan.md</code>로 돌아가 update.',
+        '<code>[p2]</code>인데 deferrable → <code>"p2 X는 defer"</code> 명시 (<code>&lt;decisions&gt;</code>에 <code>deferred: ...</code> 기록됨)',
+        '<code>[p3]</code>/<code>[p4]</code>가 흥미로움 → follow-up TODO로 충분, 굳이 즉시 고치지 않음',
+        'reviewer가 Chesterton\'s Fence로 질문함 → 코드가 왜 그 자리에 있는지 사람만 아는 경우, 답변 필수',
+      ],
+    },
+    failed: {
+      title: '/impl 중 — task 실패 시',
+      hint: '<code>failed/</code>로 이동된 result 파일을 직접 읽고 원인 분류.',
+      items: [
+        'AC가 실현 불가능했나? → task 파일 수정 후 <code>pending/</code>으로 되돌리기',
+        '외부 의존성 문제인가? → 환경 문제는 워크플로우 밖에서 해결',
+        'plan.md의 가정이 틀렸나? → 가장 흔한 케이스. <code>/spec-plan</code>으로 돌아가 update (<code>plan-v2.md</code> 생성됨)',
+      ],
+    },
+    integ: {
+      title: 'Integrator 보고 직후',
+      hint: 'gate 평가는 LLM이 한다. 사람이 사후 확인하지 않으면 가짜 통과를 놓친다.',
+      items: [
+        'Quality Gates 모든 항목이 실제로 통과했는가? (LLM 평가 검증)',
+        '<code>manifest.yaml</code>의 runner/model 필드 확인 — 이번 run이 어떤 조합으로 실행되었는지 (사후 비용 비교용)',
+        '수동 테스트 (UI, 외부 시스템) 직접 수행',
+        'PR 생성 전 diff 한번 더 훑기 — orchestrator가 자동 push하지 않으므로 마지막 확인 기회',
+      ],
+    },
+    pr: {
+      title: 'PR 단계',
+      hint: '리뷰어들이 plan과 의도까지 따라갈 수 있도록 링크를 충실히.',
+      items: [
+        'PR 본문에 <code>plan.md</code> 링크와 ticket 명시',
+        'reviewer가 남긴 <code>&lt;handoff&gt;</code> follow-up TODO를 issue로 옮기거나 PR description에 명시',
+      ],
+    },
+  };
+
+  const container = document.getElementById('check-container');
+  const pickerBtns = document.querySelectorAll('#scenario-picker button');
+  const progress = document.getElementById('global-progress');
+
+  const renderScenario = (key) => {
+    const sc = SCENARIOS[key];
+    const state = load();
+    const sKey = (i) => `${key}:${i}`;
+    let html = `<div class="check-card">
+      <h4>${sc.title}${sc.star ? `<span class="star">★ ${sc.star}</span>` : ''}</h4>
+      <p class="hint">${sc.hint}</p>
+      <ul class="check-list">`;
+    sc.items.forEach((it, i) => {
+      const checked = state[sKey(i)] ? 'checked' : '';
+      html += `<li>
+        <input type="checkbox" id="${sKey(i)}" data-key="${sKey(i)}" ${checked}>
+        <label for="${sKey(i)}">${it}</label>
+      </li>`;
+    });
+    html += `</ul>`;
+    const done = sc.items.filter((_,i)=>state[sKey(i)]).length;
+    const pct = sc.items.length ? Math.round(100*done/sc.items.length) : 0;
+    html += `<div class="progress"><div style="width:${pct}%"></div></div>`;
+    html += `<div class="meta-row" style="margin-top:6px"><span>${done} / ${sc.items.length} 완료</span></div>`;
+    if (sc.feedback) {
+      html += `<h3 style="font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:16px">피드백 패턴</h3>
+        <table class="feedback-table"><tbody>`;
+      sc.feedback.forEach(([k,v]) => { html += `<tr><td style="width:40%">${k}</td><td>${v}</td></tr>`; });
+      html += `</tbody></table>`;
+    }
+    html += `</div>`;
+    container.innerHTML = html;
+    container.querySelectorAll('input[type=checkbox]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const s = load();
+        if (cb.checked) s[cb.dataset.key] = true; else delete s[cb.dataset.key];
+        save(s);
+        renderScenario(key);
+        updateGlobal();
+      });
+    });
+  };
+
+  const updateGlobal = () => {
+    const state = load();
+    let total = 0, done = 0;
+    Object.values(SCENARIOS).forEach(sc => {
+      sc.items.forEach((_,i)=>{
+        total++;
+        // find scenario key
+      });
+    });
+    // recompute via keys
+    total = 0; done = 0;
+    Object.entries(SCENARIOS).forEach(([k, sc]) => {
+      sc.items.forEach((_,i)=>{
+        total++;
+        if (state[`${k}:${i}`]) done++;
+      });
+    });
+    progress.textContent = `전체 진행: ${done} / ${total}`;
+  };
+
+  pickerBtns.forEach(btn => btn.addEventListener('click', () => {
+    pickerBtns.forEach(b => b.classList.toggle('active', b === btn));
+    renderScenario(btn.dataset.s);
+  }));
+
+  document.getElementById('reset-all').addEventListener('click', () => {
+    if (!confirm('모든 체크 상태를 초기화할까요?')) return;
+    localStorage.removeItem(STORAGE_KEY);
+    const active = document.querySelector('#scenario-picker button.active');
+    renderScenario(active.dataset.s);
+    updateGlobal();
+  });
+
+  renderScenario('g1');
+  updateGlobal();
+})();
+</script>
+</body>
+</html>
