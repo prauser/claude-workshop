@@ -4,6 +4,18 @@ Planning only. Never write code or trigger implementation. All subagents are rea
 
 **Usage**: `/spec-plan {TICKET} [--no-self-pass] [--grill]`
 
+## Template path resolution
+
+본 prompt 와 sub-agent 는 `templates/workflow-contract/...` 의 SSOT 파일을 인용한다.
+**resolution 규칙 (cwd 우선, `~/.claude/templates` 폴백)**:
+`./templates/workflow-contract/{file}` 가 존재하면 그것, 없으면
+`~/.claude/templates/workflow-contract/{file}` 를 사용. 둘 다 없으면 사용자에게
+"`./deploy.sh` 미실행 가능성" 경고 후 진행 중단.
+
+이 규칙은 in-session orchestrator / implementer / reviewer / integrator / 헤드리스 러너 모두 동일.
+
+적용 대상: `grill.md` (Pre-search grill · Gate 0 · Gate 2 sequential 엔진 SSOT), `preamble.md` (§9 텍스트 instruction · §8 위험영역 SSOT), 그 외 본 파일이 `templates/workflow-contract/` 경로로 인용하는 모든 SSOT 파일.
+
 ## On activation
 
 1. Parse ticket ID from arguments.
