@@ -76,7 +76,21 @@ cost / latency 측정은 `runs/{TICKET}/manifest.yaml` 의 model / runner 필드
      - Not found: proceed to spec discussion.
    - **Free text**: use as initial context for spec discussion.
    - **No argument**: ask user what to implement.
-2. **Spec discussion** (when no plan.md): elicit requirements, summarize as bullets, confirm.
+2. **Spec discussion** (when no plan.md): invoke grill `elicit` mode to gather requirements.
+   ```
+   grill(mode: elicit, seed: <free_text_input>, cap: 3, output: mini_intent)
+   → 수렴 시: {problem, approach} 반환 → mini-Intent Header로 기록
+   → 미수렴 시: 호출자 자체 슬롯에 미수렴 사실 기록 (슬롯 이름은 호출자 결정)
+   ```
+   grill.md 경로 해석: `./templates/workflow-contract/grill.md` 우선, 없으면 `~/.claude/templates/workflow-contract/grill.md`. 둘 다 없으면 "deploy.sh 미실행" 경고 후 중단.
+
+   산출물 — **mini-Intent Header** (problem / approach 2필드):
+   ```
+   ## Intent (mini)
+   - **Problem**: {grill elicit이 확정한 problem 한 줄}
+   - **Approach**: {grill elicit이 확정한 approach 한 줄}
+   ```
+   이 problem을 후속 task 파일의 `intent_problem` frontmatter에 기입한다. full 6-field Intent Header로 부풀리지 마라 — plan 없는 경량 경로는 problem/approach 2필드면 충분.
 3. Record ticket if applicable: `echo "{TICKET}" > .claude/current-ticket`. If no external ticket exists, after confirmation assign `LOCAL-{YYYYMMDD-HHMMSS}` and record it the same way.
 4. Create run artifact directories before delegating:
    ```bash
@@ -209,7 +223,8 @@ reviewer output format SSOT: `claude-config/agents/reviewer.md` §Output format.
 
 - `intent` 블록 전체 (Problem / Approach / Why / PRD)
 - `gate_events` 요약 (각 gate 의 turns / result)
-- `skip_grill_count`
+- `skip_presearch` (pre-search grill을 건너뛴 횟수)
+- `skip_gate2` (Gate 2 grill sequential을 건너뛴 횟수)
 - `risk_acks` 중 `needs_check` 항목 (있으면)
 
 이게 팀 가시성 채널. plan.md 본문은 로컬에만 남음.
