@@ -198,3 +198,94 @@ AI 의역 금지, diff 감지 시 경고. impl.md:118 user_prompt verbatim 규�
 **여전히 보류:**
 - 위험영역 heavy 처방 전체 (원 plan Phase 4) — teach-back / 사람 설계노트 / heavy quality gate
 - 데이터 집계 L1/L2 인프라 — 데이터 누적 후
+
+## 6. 3차 라운드 — Phase 3 선결 결정 (PRA-66 grill 통합)
+
+> 출처: PRA-66 spec-plan 진입 전 기획 합의. 원 plan [[approval-clarity-plan]] §9 Phase 3 +
+> §5 2층 모델 + §6 grill 통합 지도에 대한 *선결(pre-spec-plan) 결정*.
+> Phase 1·2 는 이미 `spec-plan.md` 에 반영됨 — Phase 3 는 그 위에 grill 레이어를 얹는다.
+
+### 6.1 grill 엔진 = 단일 SSOT, 멀티 호출자 (A-1)
+
+> grill 엔진 = **"한 번에 한 질문(one-at-a-time) 멀티턴 인터뷰 루프" 하나.** Gate 0 align /
+> pre-search grill / impl free-text / Gate 2 sequential 이 *같은 엔진*을 호출하고,
+> 씨앗 입력·종료 산출물·강도만 다르게 넘긴다 (plan §5 "같은 one-at-a-time 엔진").
+
+엔진 공통 책임: ① one-at-a-time 질문(batch 표 아님) ② 양방향 확인(AI 이해 되읽기 → 사용자 정정,
+`spec-plan.md:122-136` turn 5 가 원형) ③ 캡 + light↔heavy 자연 승격 ④ 구조화 산출물 반환.
+
+호출자별 파라미터:
+
+| 호출자 | 씨앗 | mode | 산출물 | 강도 |
+|---|---|---|---|---|
+| Gate 0 align | 문제 한 줄 ↔ Step 0 findings | align | 일치 확인 (+필요 시 intent.problem 갱신, 6.3) | light |
+| Pre-search grill | 모호한 raw prompt | refine | `refined_user_prompt` (6.2) | wave(캡) |
+| impl free-text | 자유 텍스트 (plan 없음) | elicit | 요구 bullet / mini-intent | 조건부 |
+| Gate 2 sequential | 방향 좌우하는 Ambiguity | grill | 항목 결정 | 휴리스틱(6.5) |
+
+- **SSOT 위치**: `templates/workflow-contract/grill.md` (신규). 근거 = `preamble.md §8/§9` /
+  `contract.md` / `task.schema.md` 와 동일한 공유-SSOT 패턴. `spec-plan.md` 와 `impl.md` 가
+  둘 다 인용하므로 공유 위치가 정합.
+- **참조처**: `spec-plan.md` (Gate 0 align / pre-search / Gate 2), `impl.md` (free-text L79).
+- ⚠️ 정합성: `spec-plan.md` 에는 `impl.md:7-15` 같은 template path resolution(cwd 우선 →
+  `~/.claude` 폴백) 섹션이 없음. grill.md 추가 시 spec-plan 에도 동일 resolution 규칙을 박는다.
+
+### 6.2 refined_user_prompt = 별도 필드 + 검색 활용 잠금 (A-2)
+
+> raw prompt 가 검색 불가할 만큼 모호하면 Step 0 5-agent 검색이 헛돈다 → findings 오염 →
+> Gate 전체 오염. **검색 품질 = prompt 품질.** pre-search grill 이 인터뷰로 prompt 를
+> *검색 가능하게* 구체화하고 사용자가 confirm 한 것이 `refined_user_prompt`.
+
+결정 (b안 + 검색 잠금):
+- `user_prompt` = 사용자가 친 **원문 verbatim 유지** (Phase 1 잠금 불변, `spec-plan.md:362`).
+- `refined_user_prompt` = **신규 frontmatter 필드.** pre-search grill 산출물. grill 미발동이면 빈 필드(비파괴적).
+- **검색 활용 잠금**: Step 0 5-agent 검색은 `refined_user_prompt` 가 있으면 **반드시 그것으로** 검색,
+  없으면 `user_prompt` 로 폴백. (`spec-plan.md:180` Step 0 / Iterative search protocol 에 명시)
+- task 전파: `impl.md:130` verbatim 전파 규칙은 `user_prompt`(원문) 기준 유지. refined 는 검색·정렬용.
+
+### 6.3 Gate 0 align = intent.problem 갱신 경로 (원칙 관계 명시) (A-3)
+
+> **"Verbatim" = "AI 가 조용히 의역 못 한다" 이지 "영원히 동결" 이 아니다.**
+
+`intent.problem` 은 **3조건 모두** 만족 시에만 갱신:
+1. **명시적 경로** — Gate 0 align 대화에서 사용자가 "문제 한 줄을 X 로" 직접 확정.
+2. **기록 강제** — `intent_history` 에 `{ts, field: problem, prev_value(원문 그대로), reason}` append (`spec-plan.md:378` 슬롯).
+3. **AI 단독 변경 금지** — Gate 0 은 diff 를 *띄울* 수만 있고 사용자 확정 없이 갱신 불가.
+
+→ followup 1.1 지표 "Gate 1+ OK 이후 intent_history 변경률(이해 못 하고 OK)" 이 이 경로로 잡힘.
+Gate 0 turns 는 `gate_events` 에 `{gate: 0, ...}` 로 기록(현재 스키마는 gate 1/2/3 만 문서화 → gate 0 추가).
+
+### 6.4 Pre-search grill 트리거 = Readiness Check 재사용 + --grill opt-in (A-4)
+
+OR 두 트리거, **모호도 판정 중복 금지**:
+1. **자동** = Readiness Check(Phase 1, `spec-plan.md:17`) 의 "필수 빠짐/검색불가" 라우팅 *그 자체*.
+   별도 2차 판정 신설 X. 현재 "한 줄 추가 요청" 1회를 → 갭이 크면 **멀티턴 wave(목표→edge→가정) grill** 로 업그레이드.
+2. **수동** = `--grill` 플래그. **opt-in, 기본 OFF.** Readiness 가 "입력 충분" 판정해도 사용자가 강제 정련.
+
+### 6.5 Gate 2 sequential grill = 복잡도 휴리스틱 (A-5)
+
+> Phase 4 의 알맹이는 **언리얼 위험영역 태깅 + teach-back + Mermaid + 위험유형별 quality gate**.
+> "sequential grill" *메커니즘* 은 그 태깅에 묶일 필연이 없다. (Gate 2 엔 이미
+> `spec-plan.md:122-156` turn 5 양방향 + turn 6+ 형식강제 = sequential 원형이 있음.)
+
+결정:
+- **Phase 3 포함** — Gate 2 가 공유 grill 엔진을 호출. 선택 기준 = **(iii) 복잡도 휴리스틱**:
+  LLM 이 "이 Ambiguity 가 미결이면 *작업 방향이 크게 바뀐다*" 고 판정한 항목만 sequential,
+  나머지는 기존 batch 표. **약간의 마찰 허용** (방향 좌우 항목에 한해서이므로 우회 유발 낮음).
+- **Phase 4 로 남김** — "risk_areas 태그가 붙은 항목 *자동* heavy sequential" (태깅 메커니즘 = 여전히 TBD).
+- 📌 process: Gate 2 포함으로 PRA-66 제목 "grill 통합 (Gate 0 + free-text)" 이 범위와 어긋남 →
+  제목/설명에 "+ Gate 2" 보강 권장 (사용자 확인 후).
+
+### 6.6 Phase 3 작업 항목 (확정) + 비범위
+
+확정 체크리스트:
+- [ ] **grill 엔진 SSOT** — `templates/workflow-contract/grill.md` 신규. 4 mode(align/refine/elicit/grill) + 양방향 + 캡.
+- [ ] **Gate 0 align** — `spec-plan.md` Step 0 ↔ Gate 1 사이 신설. 문제 한 줄 ↔ findings diff. light 승인 형식 + `gate_events` gate 0 + intent.problem 갱신 경로(6.3).
+- [ ] **Pre-search grill** — Readiness Check 라우팅 업그레이드(6.4). `refined_user_prompt` 산출 + Step 0 검색 잠금(6.2).
+- [ ] **spec-plan template resolution** 섹션 추가 (6.1 ⚠️).
+- [ ] **/impl free-text 업그레이드** — `impl.md:79` bullet 확인 → grill 엔진 elicit 호출.
+- [ ] **Gate 2 sequential (휴리스틱)** — 방향 좌우 Ambiguity 만 엔진 호출(6.5). 기존 stuck 사다리를 엔진으로 통일.
+- [ ] (선택) `references/` 에 grill-with-docs 클론해 문구 정렬.
+
+**비범위 (Non-Goal, Phase 4):** risk_areas 태깅 메커니즘 · teach-back · 사람 설계노트 ·
+Mermaid 다이어그램 · 위험유형별 quality gate · "위험영역 자동 heavy sequential".
