@@ -2,7 +2,7 @@
 
 Planning only. Never write code or trigger implementation. All subagents are read-only.
 
-**Usage**: `/spec-plan {TICKET} [--no-self-pass]`
+**Usage**: `/spec-plan {TICKET} [--no-self-pass] [--grill]`
 
 ## On activation
 
@@ -14,7 +14,7 @@ Planning only. Never write code or trigger implementation. All subagents are rea
 
    | 등급 | 기준 | 라우팅 |
    |---|---|---|
-   | ✅ **필수(must-have)** | 무엇을 해달라는지 — 문제 / 요청. 없으면 시작 불가 | 빠짐 → 사용자에게 한 줄 추가 입력 요청, 응답 전까지 정지 |
+   | ✅ **필수(must-have)** | 무엇을 해달라는지 — 문제 / 요청. 없으면 시작 불가 | 빠짐 → (a) 갭이 **검색불가 수준**이면 → Pre-search grill(멀티턴 wave)로 라우팅; (b) 갭이 한 줄 보강으로 해소 가능하면 → 사용자에게 한 줄 추가 입력 요청, 응답 전까지 정지 |
    | ⚠️ **산출예정(will-produce)** | 상세 방향성 · 세부 AC. 없어도 정상, spec-plan 이 만들 것 | "이건 우리가 정함" 표시만 |
    | ❓ **이상(odd)** | 설명↔AC 모순, 방향성이 컨벤션과 충돌, 범위가 appetite 대비 과도 | 즉시 사람에게 플래그 |
 
@@ -28,7 +28,7 @@ Planning only. Never write code or trigger implementation. All subagents are rea
    └──────────────────────────────────────────────
    ```
 
-   필수 빠짐 → 한 줄 입력 요청 후 응답을 `user_prompt` 에 verbatim 보강. 이상 → 사용자 응답을 기다리되 플래그를 `readiness_flags:` 에 구조체로 기록:
+   필수 빠짐 → 갭 수준 판정: **검색불가 수준**(예: 도메인·기능·범위가 모두 불명확)이면 Pre-search grill로 라우팅(아래 §Pre-search grill 참조). **한 줄 보강으로 해소 가능한 수준**이면 한 줄 입력 요청 후 응답을 `user_prompt`에 verbatim 보강. 이상 → 사용자 응답을 기다리되 플래그를 `readiness_flags:` 에 구조체로 기록:
 
    ```yaml
    readiness_flags:
@@ -43,14 +43,49 @@ Planning only. Never write code or trigger implementation. All subagents are rea
 5. **GLOSSARY read** — CLAUDE.md `## Implementation Config` 의 `glossary_path:` 가 있으면 해당 파일을 읽고, 본 plan 세션 동안 §Authoring §9 우선순위 1번 (GLOSSARY hit) 에 사용한다.
    - 없거나 파일이 존재하지 않으면 step 진행 (silent skip). 단, 첫 Gate 출력 시 한 줄 `GLOSSARY: 미설정` 로 표시.
 
-6. **flag 파싱** — `--no-self-pass` opt-out flag. `--no-self-pass` 가 있으면 `self_pass = OFF`, 없으면 `self_pass = ON` (default ON). 본 세션 동안 유지.
+6. **flag 파싱** — 두 개의 opt flag을 파싱한다. 본 세션 동안 유지.
+   - `--no-self-pass`: opt-out flag. 있으면 `self_pass = OFF`, 없으면 `self_pass = ON` (기본값 ON).
+   - `--grill`: opt-in flag. 있으면 `grill_flag = ON`, 없으면 `grill_flag = OFF` (**기본값 OFF** — 명시하지 않으면 Pre-search grill을 수동으로 발동하지 않는다).
 
 7. **idiom-pool 임계 알림** — `~/.claude/idiom-pool.yaml` 이 있으면 읽어 임계(term별 count ≥ 3) 이상이고 `status: open` 인 entries 가 있는지 확인. 있으면 첫 출력 직전 한 줄 알림:
    `idiom-pool: N건 임계 (예: stale ×5, idempotent ×4). \`/idiom-review\` 권장.`
    - 알림은 *정보성* — 자동 트리거 X (사용자가 명시 호출해야 실행됨).
    - 파일 없음 또는 임계 항목 없음 → 조용히 skip.
 
-**게이트 실행 순서**: Step 0 (Context gathering) → **Gate 0** (align, 의도 정렬) → Gate 1 (Requirements) → Gate 2 (Plan + Ambiguities) → Gate 3 (Test Strategy) → Step 2 (Cross-review) → Final Review → Step 4 (Save plan).
+## Pre-search grill (Step 0 이전 — prompt 정련)
+
+> **실행 위치**: Readiness Check 완료 직후, Step 0 진입 직전.
+
+### 트리거 조건 (OR — 둘 중 하나라도 해당하면 실행)
+
+| 트리거 | 조건 |
+|---|---|
+| **자동** | Readiness Check의 "필수 빠짐" 등급 판정에서 갭이 **검색불가 수준**으로 라우팅된 경우 (별도 2차 모호도 판정 신설 금지 — Readiness Check 판정 재사용) |
+| **수동** | 사용자가 `--grill` 플래그를 명시한 경우 (`grill_flag = ON`). `--grill` 기본값은 OFF(opt-in) — 명시하지 않으면 수동 트리거 발동 안 함 |
+
+### 실행 규칙
+
+grill 엔진을 `refine` mode로 호출한다 (SSOT: `templates/workflow-contract/grill.md` §2.2, §4):
+
+```
+grill(
+  mode:   refine
+  seed:   <user_prompt>
+  cap:    3  (웨이브당 1~2질문, 정렬 달성 시 캡 소진 전 자연종료)
+  output: refined_user_prompt
+)
+→ 수렴 시: refined_user_prompt 반환 (user_prompt 원문은 변경하지 않고 verbatim 유지)
+→ 미수렴(3웨이브 후 미완):
+    readiness_flags += {flag: presearch-grill-incomplete, detail: "3웨이브 후 미수렴", ts: <ISO 8601>}
+```
+
+### 주의사항
+
+- **`user_prompt` 원문 verbatim 잠금** — `refined_user_prompt`는 별도 필드. `user_prompt`에 덮어쓰지 않는다.
+- **모호도 판정 재사용** — 자동 트리거는 Readiness Check가 이미 진단한 결과를 재사용한다. 새 판정 로직을 신설하지 않는다.
+- **기본 off** — `--grill`이 없으면 수동 트리거는 발동하지 않는다.
+
+**게이트 실행 순서**: Pre-search grill (해당 시) → Step 0 (Context gathering) → **Gate 0** (align, 의도 정렬) → Gate 1 (Requirements) → Gate 2 (Plan + Ambiguities) → Gate 3 (Test Strategy) → Step 2 (Cross-review) → Final Review → Step 4 (Save plan).
 
 ## Authoring rules (apply to all Gate outputs)
 
@@ -185,12 +220,14 @@ implementer 가 SKIP 된 Open Question 을 만나면 자기 판단으로 결정�
 ## Iterative search protocol (max 3 cycles)
 
 Used by Spec Agent and Code Agent:
-1. DISPATCH: search target paths with feature keywords
+1. DISPATCH: search target paths with feature keywords — **검색 잠금**: `refined_user_prompt`가 있으면 그것을, 없으면 `user_prompt`를 초기 키워드로 사용
 2. EVALUATE: score results 0.0–1.0 for relevance, identify gaps
 3. REFINE: use discovered terms to broaden search (codebase may use different terminology)
 4. LOOP: repeat until sufficient coverage or 3 cycles reached
 
 ## Step 0 — Context gathering (parallel)
+
+> **검색 잠금**: 모든 에이전트의 키워드 검색은 **`refined_user_prompt`가 있으면 그것을, 없으면 `user_prompt`를** 기준으로 한다. Iterative search protocol도 동일하게 적용. 이 규칙은 이하 5개 에이전트 전부에 공통으로 적용된다.
 
 Spawn 5 read-only subagents in parallel:
 
@@ -198,6 +235,7 @@ Spawn 5 read-only subagents in parallel:
 - `jira-tools get {TICKET}` via Bash (returns JSON)
 - Collect: description, acceptance criteria, related issues, epic context
 - If fails: ask user to paste ticket details
+- 검색 키워드 우선순위: `refined_user_prompt` 있으면 우선 사용, 없으면 `user_prompt` 사용
 
 **[Spec Agent]** (sonnet) — skip if no config
 
@@ -208,16 +246,20 @@ Spawn 5 read-only subagents in parallel:
   `policies_path` using the iterative search protocol (existing behavior). No regression.
 - Return: requirements, priorities (P0/P1), open questions, **and a list of cited doc IDs (or
   none)**.
+- 검색 키워드 우선순위: `refined_user_prompt` 있으면 우선 사용, 없으면 `user_prompt` 사용
 
 **[Code Agent]** (opus)
 - Search codebase files matching ticket keywords using iterative search protocol
 - Return: affected files, dependency map, risk areas, test coverage
+- 검색 키워드 우선순위: `refined_user_prompt` 있으면 우선 사용, 없으면 `user_prompt` 사용
 
 **[Context Agent]** (sonnet) — skip if no config
 - Search `log_repo` for past similar work logs
 - Return: related knowledge, past learnings
+- 검색 키워드 우선순위: `refined_user_prompt` 있으면 우선 사용, 없으면 `user_prompt` 사용
 
 **[Test Agent]** (sonnet) — spawn `test-engineer` in Strategy mode; return its `<test-plan>` output
+- 검색 키워드 우선순위: `refined_user_prompt` 있으면 우선 사용, 없으면 `user_prompt` 사용
 
 ## Gate 0 — Align (의도 정렬)
 
@@ -426,7 +468,9 @@ Present consolidated plan summary (all gates + cross-review results). User can:
 ticket: {TICKET}
 created_at: {ISO 8601 with timezone}
 user_prompt: |
-  {사용자가 /spec-plan을 호출하며 입력한 최초 프롬프트 전문 — indent 보존. 요약·정제 금지.}
+  {사용자가 /spec-plan을 호출하며 입력한 최초 프롬프트 전문 — indent 보존. 요약·정제 금지. verbatim 잠금.}
+refined_user_prompt: |
+  {Pre-search grill이 실행된 경우 — grill(mode: refine) 결과물. 사용자가 confirm한 정련된 prompt. user_prompt 원문은 변경하지 않고 이 필드에 별도 보존. grill 미실행 시 이 필드 생략(emit 금지).}
 intent:
   problem: |
     {Readiness Check 의 "문제 정의" 한 줄을 verbatim 복사. AI 의역 금지. 기능 레벨.}
