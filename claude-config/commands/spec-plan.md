@@ -184,7 +184,7 @@ Gate 2 Ambiguity 표를 제시하기 *전에*, LLM 이 각 항목을 자동 판�
 
 > **판정 기준**: "이 Ambiguity 가 미결이면 작업 방향이 크게 바뀐다" — 예) 아키텍처 결정, 데이터 흐름 분기, 인터페이스 계약 변경 등.
 
-- **방향을 크게 바꾸는 항목** → grill 엔진 `grill` mode 로 sequential 처리 (one-at-a-time):
+- **방향을 크게 바꾸는 항목** → grill 엔진 `grill` mode 로 sequential 처리 (one-at-a-time) (SSOT: `templates/workflow-contract/grill.md` §2.4, §4):
 
   ```
   grill(
@@ -522,7 +522,7 @@ intent:
   prd_ref: {PRD / 티켓 / pitch 링크 — PRD 레벨 P/A/W 는 여기로}
 risk_areas: []        # +α slug 만 (baseline 5종 — memory/replication/concurrency/architecture/build-deploy — 은 preamble.md §8 하드코딩, 본 필드에 중복 X). 자유 추가 영역도 같은 kebab slug 형식.
 docs_cited: [ADR-014, CONV-007]   # omit 가능 — yaml docs 없을 때는 필드 자체 제거 (빈 배열 emit 금지)
-readiness_flags: []   # Readiness Check 의 "이상" 등급 항목. 각 {flag, detail, resolution, ts}. resolution 없으면 미해결 진행.
+readiness_flags: []   # Readiness Check 의 "이상" 등급 항목 + grill 미수렴 플래그(presearch-grill-incomplete / gate2-grill-incomplete). 각 {flag, detail, resolution, ts}. resolution 없으면 미해결 진행.
 skip_presearch: 0     # pre-search grill 명시적 skip 시 +1 (Approval response rules)
 skip_gate2: 0         # Gate 2 Ambiguity 명시적 skip 시 +1 (SKIP behavior)
 gate_events:          # 게이트 별 결과 자동 기록. {gate, result, turns, self_pass, ts}. turns = 사용자 응답 메시지 수. gate 허용값: 0(align)/1/2/3.
