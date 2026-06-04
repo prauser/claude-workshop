@@ -2,7 +2,19 @@
 
 Planning only. Never write code or trigger implementation. All subagents are read-only.
 
-**Usage**: `/spec-plan {TICKET} [--no-self-pass]`
+**Usage**: `/spec-plan {TICKET} [--no-self-pass] [--grill]`
+
+## Template path resolution
+
+본 prompt 와 sub-agent 는 `templates/workflow-contract/...` 의 SSOT 파일을 인용한다.
+**resolution 규칙 (cwd 우선, `~/.claude/templates` 폴백)**:
+`./templates/workflow-contract/{file}` 가 존재하면 그것, 없으면
+`~/.claude/templates/workflow-contract/{file}` 를 사용. 둘 다 없으면 사용자에게
+"`./deploy.sh` 미실행 가능성" 경고 후 진행 중단.
+
+이 규칙은 in-session orchestrator / implementer / reviewer / integrator / 헤드리스 러너 모두 동일.
+
+적용 대상: `grill.md` (Pre-search grill · Gate 0 · Gate 2 sequential 엔진 SSOT), `preamble.md` (§9 텍스트 instruction · §8 위험영역 SSOT), 그 외 본 파일이 `templates/workflow-contract/` 경로로 인용하는 모든 SSOT 파일.
 
 ## On activation
 
@@ -14,7 +26,7 @@ Planning only. Never write code or trigger implementation. All subagents are rea
 
    | 등급 | 기준 | 라우팅 |
    |---|---|---|
-   | ✅ **필수(must-have)** | 무엇을 해달라는지 — 문제 / 요청. 없으면 시작 불가 | 빠짐 → 사용자에게 한 줄 추가 입력 요청, 응답 전까지 정지 |
+   | ✅ **필수(must-have)** | 무엇을 해달라는지 — 문제 / 요청. 없으면 시작 불가 | 빠짐 → (a) 갭이 **검색불가 수준**이면 → Pre-search grill(멀티턴 wave)로 라우팅; (b) 갭이 한 줄 보강으로 해소 가능하면 → 사용자에게 한 줄 추가 입력 요청, 응답 전까지 정지 |
    | ⚠️ **산출예정(will-produce)** | 상세 방향성 · 세부 AC. 없어도 정상, spec-plan 이 만들 것 | "이건 우리가 정함" 표시만 |
    | ❓ **이상(odd)** | 설명↔AC 모순, 방향성이 컨벤션과 충돌, 범위가 appetite 대비 과도 | 즉시 사람에게 플래그 |
 
@@ -28,7 +40,7 @@ Planning only. Never write code or trigger implementation. All subagents are rea
    └──────────────────────────────────────────────
    ```
 
-   필수 빠짐 → 한 줄 입력 요청 후 응답을 `user_prompt` 에 verbatim 보강. 이상 → 사용자 응답을 기다리되 플래그를 `readiness_flags:` 에 구조체로 기록:
+   필수 빠짐 → 갭 수준 판정: **검색불가 수준**(예: 도메인·기능·범위가 모두 불명확)이면 Pre-search grill로 라우팅(아래 §Pre-search grill 참조). **한 줄 보강으로 해소 가능한 수준**이면 한 줄 입력 요청 후 응답을 `user_prompt`에 verbatim 보강. 이상 → 사용자 응답을 기다리되 플래그를 `readiness_flags:` 에 구조체로 기록:
 
    ```yaml
    readiness_flags:
@@ -43,12 +55,49 @@ Planning only. Never write code or trigger implementation. All subagents are rea
 5. **GLOSSARY read** — CLAUDE.md `## Implementation Config` 의 `glossary_path:` 가 있으면 해당 파일을 읽고, 본 plan 세션 동안 §Authoring §9 우선순위 1번 (GLOSSARY hit) 에 사용한다.
    - 없거나 파일이 존재하지 않으면 step 진행 (silent skip). 단, 첫 Gate 출력 시 한 줄 `GLOSSARY: 미설정` 로 표시.
 
-6. **flag 파싱** — `--no-self-pass` opt-out flag. `--no-self-pass` 가 있으면 `self_pass = OFF`, 없으면 `self_pass = ON` (default ON). 본 세션 동안 유지.
+6. **flag 파싱** — 두 개의 opt flag을 파싱한다. 본 세션 동안 유지.
+   - `--no-self-pass`: opt-out flag. 있으면 `self_pass = OFF`, 없으면 `self_pass = ON` (기본값 ON).
+   - `--grill`: opt-in flag. 있으면 `grill_flag = ON`, 없으면 `grill_flag = OFF` (**기본값 OFF** — 명시하지 않으면 Pre-search grill을 수동으로 발동하지 않는다).
 
 7. **idiom-pool 임계 알림** — `~/.claude/idiom-pool.yaml` 이 있으면 읽어 임계(term별 count ≥ 3) 이상이고 `status: open` 인 entries 가 있는지 확인. 있으면 첫 출력 직전 한 줄 알림:
    `idiom-pool: N건 임계 (예: stale ×5, idempotent ×4). \`/idiom-review\` 권장.`
    - 알림은 *정보성* — 자동 트리거 X (사용자가 명시 호출해야 실행됨).
    - 파일 없음 또는 임계 항목 없음 → 조용히 skip.
+
+## Pre-search grill (Step 0 이전 — prompt 정련)
+
+> **실행 위치**: Readiness Check 완료 직후, Step 0 진입 직전.
+
+### 트리거 조건 (OR — 둘 중 하나라도 해당하면 실행)
+
+| 트리거 | 조건 |
+|---|---|
+| **자동** | Readiness Check의 "필수 빠짐" 등급 판정에서 갭이 **검색불가 수준**으로 라우팅된 경우 (별도 2차 모호도 판정 신설 금지 — Readiness Check 판정 재사용) |
+| **수동** | 사용자가 `--grill` 플래그를 명시한 경우 (`grill_flag = ON`). `--grill` 기본값은 OFF(opt-in) — 명시하지 않으면 수동 트리거 발동 안 함 |
+
+### 실행 규칙
+
+grill 엔진을 `refine` mode로 호출한다 (SSOT: `templates/workflow-contract/grill.md` §2.2, §4):
+
+```
+grill(
+  mode:   refine
+  seed:   <user_prompt>
+  cap:    3  (웨이브당 1~2질문, 정렬 달성 시 캡 소진 전 자연종료)
+  output: refined_user_prompt
+)
+→ 수렴 시: refined_user_prompt 반환 (user_prompt 원문은 변경하지 않고 verbatim 유지)
+→ 미수렴(3웨이브 후 미완):
+    readiness_flags += {flag: presearch-grill-incomplete, detail: "3웨이브 후 미수렴", ts: <ISO 8601>}
+```
+
+### 주의사항
+
+- **`user_prompt` 원문 verbatim 잠금** — `refined_user_prompt`는 별도 필드. `user_prompt`에 덮어쓰지 않는다.
+- **모호도 판정 재사용** — 자동 트리거는 Readiness Check가 이미 진단한 결과를 재사용한다. 새 판정 로직을 신설하지 않는다.
+- **기본 off** — `--grill`이 없으면 수동 트리거는 발동하지 않는다.
+
+**게이트 실행 순서**: Pre-search grill (해당 시) → Step 0 (Context gathering) → **Gate 0** (align, 의도 정렬) → Gate 1 (Requirements) → Gate 2 (Plan + Ambiguities) → Gate 3 (Test Strategy) → Step 2 (Cross-review) → Final Review → Step 4 (Save plan).
 
 ## Authoring rules (apply to all Gate outputs)
 
@@ -74,15 +123,26 @@ Planning only. Never write code or trigger implementation. All subagents are rea
 
    **위임 시점**: Gate 1 / 2 / 3 / Final Review 출력 *모두* 에 적용. §Authoring rules 전체 prefix 와 정합.
 
-## Approval response rules (Gate 2 / 3)
+## Approval response rules (Gate 0 / 1 / 2 / 3)
 
-Gate 2 / 3 의 사용자 승인은 *형식* 도 검증한다. 우회 패턴 차단.
+각 게이트의 사용자 승인은 *형식* 도 검증한다. 우회 패턴 차단.
 
-- **한 단어 OK 거부**: "ok" / "go" / "네" 단독 응답은 Gate 2 / 3 에서 거부하고 재질문. 사용자는 다음 둘 중 하나 형태로 응답해야 한다:
+승인 형식 계층 (낮은 → 높은 기준):
+
+| 게이트 | 허용 형식 | 비고 |
+|---|---|---|
+| **Gate 1** (Requirements) | 한 단어 OK (`"OK"`, `"진행해"`) | 의도 승인이지 기술 리뷰가 아님 |
+| **Gate 0** (align) | `"맞다"` + 무엇이 맞는지 **한 줄** | bare OK 불가. 예: "맞다. 문제 정의 정확함" |
+| **Gate 2 / 3** | `"맞다"` + 무엇이 맞는지 한 줄 **+ 근거** | 한 단어 OK 거부, 재질문 |
+
+- **Gate 2 / 3 한 단어 OK 거부**: "ok" / "go" / "네" 단독 응답은 거부하고 재질문. 사용자는 다음 둘 중 하나 형태로 응답해야 한다:
   - `"맞다"` + 무엇이 맞는지 한 줄 (예: "맞다. Impact Scope 의 3개 파일 정확함")
   - `"틀린 곳: ..."` + 어디가 틀렸는지
-- **Gate 1 (Requirements) 은 예외** — 한 단어 OK 허용 (Gate 1 은 *의도* 승인이지 기술 리뷰가 아님).
-- **`skip_grill_count` 카운터** — 사용자가 *명시적* skip 요청(예: `--skip-grill`, "건너뛰기", "grill 빼고") 또는 §Gate 2 "건너뛰기" 단축경로를 쓸 때만 plan.md frontmatter `skip_grill_count` 를 1 증가. 일반 "일괄 결정"(각 Ambiguity 에 explicit 응답을 모아 한 번에)은 정상 흐름이므로 카운트 X. PR 본문 주입 시 같이 노출.
+- **skip 카운터 (mode 별 분리)** — skip 요청 유형에 따라 카운터를 분리한다:
+  - **pre-search skip**: 사용자가 `--grill` 발동 후 *명시적* skip 요청(예: `--skip-grill`, "grill 빼고")을 하면 → plan.md frontmatter `skip_presearch` +1. Pre-search grill을 건너뛴 횟수.
+  - **Gate 2 ambiguity skip**: 사용자가 Gate 2 Ambiguity에 대해 §SKIP behavior 경로(Turn 7+ "skip" 또는 명시 `--skip-grill` / "건너뛰기")를 쓰면 → plan.md frontmatter `skip_gate2` +1. Gate 2 Ambiguity를 건너뛴 횟수.
+  - 일반 "일괄 결정"(각 Ambiguity 에 explicit 응답을 모아 한 번에)은 정상 흐름이므로 카운트 X.
+  - 두 카운터 모두 PR 본문 주입 시 노출.
 
 ## Self-pass turn
 
@@ -98,13 +158,17 @@ Gate 2 / 3 의 사용자 승인은 *형식* 도 검증한다. 우회 패턴 차�
 
 ## Gate event recording
 
-매 게이트 (1 / 2 / 3) 가 종료(OK / revise / skip)할 때마다 plan.md frontmatter `gate_events:` 에 한 줄 append:
+매 게이트 (0 / 1 / 2 / 3) 가 종료(OK / revise / skip)할 때마다 plan.md frontmatter `gate_events:` 에 한 줄 append:
 
 ```yaml
+- {gate: 0, result: ok|revise|skip, turns: <int>, self_pass: <bool>, ts: <ISO 8601>}
 - {gate: 2, result: ok|revise|skip, turns: <int>, self_pass: <bool>, ts: <ISO 8601>}
 ```
 
+`gate` 필드 허용 값: `0` (align), `1` (Requirements), `2` (Plan + Ambiguities), `3` (Test Strategy).
+
 `self_pass`: 본 gate 의 출력 직후 self-pass turn 이 발동했는지 (ON + revised or unchanged) / OFF 면 false.
+Gate 0 (align) 는 light gate 이므로 self-pass 는 "생략 가능" — 미결(Open Question).
 
 **`turns` 정의**: gate 첫 출력부터 최종 OK 까지의 **사용자 응답 메시지 수** (AI 출력 카운트 X, revise 응답 포함). 예: AI 출력 → "ok" 거부 → "맞다 X" = turns 2.
 
@@ -113,6 +177,31 @@ Gate 2 / 3 의 사용자 승인은 *형식* 도 검증한다. 우회 패턴 차�
 ## Gate 2 stuck detection — 5턴 힌트 + turn 6+ 형식 강제
 
 Gate 2 는 *상시 이해 게이트* (Plan / Ambiguity 결정). 5턴 힌트는 *별도 게이트 아님* — Gate 2 안의 stuck detection 안전판.
+
+### Gate 2 sequential 휴리스틱 (grill mode)
+
+Gate 2 Ambiguity 표를 제시하기 *전에*, LLM 이 각 항목을 자동 판정한다:
+
+> **판정 기준**: "이 Ambiguity 가 미결이면 작업 방향이 크게 바뀐다" — 예) 아키텍처 결정, 데이터 흐름 분기, 인터페이스 계약 변경 등.
+
+- **방향을 크게 바꾸는 항목** → grill 엔진 `grill` mode 로 sequential 처리 (one-at-a-time) (SSOT: `templates/workflow-contract/grill.md` §2.4, §4):
+
+  ```
+  grill(
+    mode:   grill
+    seed:   <해당 Ambiguity 항목>
+    cap:    3
+    output: ambiguity_decision
+  )
+  → 수렴 시: 항목 결정 기록.
+  → 미수렴(3웨이브) 시: readiness_flags += {flag: gate2-grill-incomplete, detail: "3웨이브 후 미수렴", ts: <ISO 8601>}
+  ```
+
+- **나머지 항목** → 기존 batch 표를 그대로 유지 (일괄 결정 허용).
+
+**주의**: 모든 Ambiguity 를 sequential 로 만들지 않는다. 방향을 좌우하는 항목 한정이므로 우회 유발이 낮다 (plan §4 다이얼).
+
+---
 
 ### Turn 1-4 (평시, 자유 응답)
 
@@ -164,7 +253,7 @@ Gate 2 는 *상시 이해 게이트* (Plan / Ambiguity 결정). 5턴 힌트는 *
    > "이 Ambiguity 는 Task {N} 분해에 *영향* — SKIP 시 {구체 항목}이 미정 상태로 implementer 에게 위임됨. 진짜 SKIP 하시겠습니까?"
    - 영향 없음 → 즉시 SKIP 처리
    - 영향 있음 → 사용자가 "응" 응답 필요. "아 그럼 결정" 응답 시 Ambiguity 로 복귀
-3. **카운터 +1** — `skip_grill_count` 1 증가. PR 본문 주입 시 노출.
+3. **카운터 +1** — `skip_gate2` 1 증가. PR 본문 주입 시 노출.
 4. **Open Question 마킹** — Open Questions 항목 끝에 `(skipped from Ambiguity #{N} at gate-2 turn {T})` 표시.
 
 implementer 가 SKIP 된 Open Question 을 만나면 자기 판단으로 결정하고 result `<decisions>` 에 한 줄 기록 — 일반 Open Question 처리 흐름과 동일.
@@ -172,12 +261,14 @@ implementer 가 SKIP 된 Open Question 을 만나면 자기 판단으로 결정�
 ## Iterative search protocol (max 3 cycles)
 
 Used by Spec Agent and Code Agent:
-1. DISPATCH: search target paths with feature keywords
+1. DISPATCH: search target paths with feature keywords — **검색 잠금**: `refined_user_prompt`가 있으면 그것을, 없으면 `user_prompt`를 초기 키워드로 사용
 2. EVALUATE: score results 0.0–1.0 for relevance, identify gaps
 3. REFINE: use discovered terms to broaden search (codebase may use different terminology)
 4. LOOP: repeat until sufficient coverage or 3 cycles reached
 
 ## Step 0 — Context gathering (parallel)
+
+> **검색 잠금**: 모든 에이전트의 키워드 검색은 **`refined_user_prompt`가 있으면 그것을, 없으면 `user_prompt`를** 기준으로 한다. Iterative search protocol도 동일하게 적용. 이 규칙은 이하 5개 에이전트 전부에 공통으로 적용된다.
 
 Spawn 5 read-only subagents in parallel:
 
@@ -185,6 +276,7 @@ Spawn 5 read-only subagents in parallel:
 - `jira-tools get {TICKET}` via Bash (returns JSON)
 - Collect: description, acceptance criteria, related issues, epic context
 - If fails: ask user to paste ticket details
+- 검색 키워드 우선순위: `refined_user_prompt` 있으면 우선 사용, 없으면 `user_prompt` 사용
 
 **[Spec Agent]** (sonnet) — skip if no config
 
@@ -195,16 +287,73 @@ Spawn 5 read-only subagents in parallel:
   `policies_path` using the iterative search protocol (existing behavior). No regression.
 - Return: requirements, priorities (P0/P1), open questions, **and a list of cited doc IDs (or
   none)**.
+- 검색 키워드 우선순위: `refined_user_prompt` 있으면 우선 사용, 없으면 `user_prompt` 사용
 
 **[Code Agent]** (opus)
 - Search codebase files matching ticket keywords using iterative search protocol
 - Return: affected files, dependency map, risk areas, test coverage
+- 검색 키워드 우선순위: `refined_user_prompt` 있으면 우선 사용, 없으면 `user_prompt` 사용
 
 **[Context Agent]** (sonnet) — skip if no config
 - Search `log_repo` for past similar work logs
 - Return: related knowledge, past learnings
+- 검색 키워드 우선순위: `refined_user_prompt` 있으면 우선 사용, 없으면 `user_prompt` 사용
 
 **[Test Agent]** (sonnet) — spawn `test-engineer` in Strategy mode; return its `<test-plan>` output
+- 검색 키워드 우선순위: `refined_user_prompt` 있으면 우선 사용, 없으면 `user_prompt` 사용
+
+## Gate 0 — Align (의도 정렬)
+
+> **실행 위치**: Step 0 완료 직후, Gate 1 진입 직전.
+> **강도**: light — 1~2질문으로 짧게 닫는다. 수렴되면 바로 Gate 1로 진행.
+
+### Gate 0 목적
+
+`user_prompt`·`intent.problem`의 "문제 한 줄"과 Step 0 탐색 결과를 대조해 사용자 의도와 AI 이해가 일치하는지 확인한다. 어긋남이 있으면 짧은 정렬 대화를 거쳐 일치를 확정받는다. 복잡하면 grill 엔진으로 자연 승격.
+
+### Gate 0 실행
+
+grill 엔진을 `align` mode로 호출한다 (SSOT: `templates/workflow-contract/grill.md` §2.1, §4):
+
+```
+grill(
+  mode:   align
+  seed:   "문제 한 줄 ↔ Step 0 findings"
+  cap:    small (light gate — 1~2웨이브)
+  output: intent_history
+)
+→ 수렴 시: 일치 확인 기록.
+  사용자가 직접 확정한 경우에만 intent_history += {ts, field: problem, prev_value, reason}
+→ 미수렴 시: 호출자 자체 판단 (readiness_flags에 기록 권장)
+```
+
+**diff 노출**: "당신 문제 한 줄 ↔ 내가 찾은 것"을 대조해 어긋남이 있으면 짧은 정렬 대화를 먼저 시도. 어긋남이 없으면 바로 Gate 1로 진행.
+
+### intent.problem 갱신 경로 (3조건 — 모두 충족해야 갱신 가능)
+
+Gate 0 대화 중 문제 한 줄을 바꿔야 하는 경우:
+
+1. **(명시적 확정)** 사용자가 "문제 한 줄을 X로" 직접 확정한 경우에만 갱신한다.
+2. **(기록 강제)** `intent_history`에 `{ts, field: problem, prev_value: <원문 그대로>, reason}` 항목을 추가한다. 변경 전 텍스트를 verbatim(원문 그대로)으로 보존한다.
+3. **(AI 단독 변경 금지)** diff를 사용자에게 제시할 수만 있고, 사용자 확정 없이는 갱신 불가.
+
+> **verbatim 원칙**: "verbatim"은 AI가 조용히 의역 못 한다는 뜻이지 영원히 동결이 아니다. 사용자가 직접 확정하면 갱신할 수 있다.
+
+### Gate 0 승인 형식
+
+승인 형식: `"맞다"` + 무엇이 맞는지 **한 줄**. bare OK 불가.
+
+> 형식 계층: Gate 1 (bare OK) < Gate 0 (맞다+한줄) < Gate 2/3 (맞다+근거)
+
+### Gate 0 기록
+
+Gate 0 종료 시 `gate_events:`에 한 줄 append:
+```yaml
+- {gate: 0, result: ok|revise|skip, turns: <int>, self_pass: <bool>, ts: <ISO 8601>}
+```
+self_pass: Gate 0 는 light gate 이므로 생략 가능 (미결 — Open Question).
+
+---
 
 ## Gate 1 — Requirements
 
@@ -360,7 +509,9 @@ Present consolidated plan summary (all gates + cross-review results). User can:
 ticket: {TICKET}
 created_at: {ISO 8601 with timezone}
 user_prompt: |
-  {사용자가 /spec-plan을 호출하며 입력한 최초 프롬프트 전문 — indent 보존. 요약·정제 금지.}
+  {사용자가 /spec-plan을 호출하며 입력한 최초 프롬프트 전문 — indent 보존. 요약·정제 금지. verbatim 잠금.}
+refined_user_prompt: |
+  {Pre-search grill이 실행된 경우 — grill(mode: refine) 결과물. 사용자가 confirm한 정련된 prompt. user_prompt 원문은 변경하지 않고 이 필드에 별도 보존. grill 미실행 시 이 필드 생략(emit 금지).}
 intent:
   problem: |
     {Readiness Check 의 "문제 정의" 한 줄을 verbatim 복사. AI 의역 금지. 기능 레벨.}
@@ -371,9 +522,11 @@ intent:
   prd_ref: {PRD / 티켓 / pitch 링크 — PRD 레벨 P/A/W 는 여기로}
 risk_areas: []        # +α slug 만 (baseline 5종 — memory/replication/concurrency/architecture/build-deploy — 은 preamble.md §8 하드코딩, 본 필드에 중복 X). 자유 추가 영역도 같은 kebab slug 형식.
 docs_cited: [ADR-014, CONV-007]   # omit 가능 — yaml docs 없을 때는 필드 자체 제거 (빈 배열 emit 금지)
-readiness_flags: []   # Readiness Check 의 "이상" 등급 항목. 각 {flag, detail, resolution, ts}. resolution 없으면 미해결 진행.
-skip_grill_count: 0   # 명시적 skip 요청 시에만 +1 (Approval response rules)
-gate_events:          # 게이트 별 결과 자동 기록. {gate, result, turns, self_pass, ts}. turns = 사용자 응답 메시지 수.
+readiness_flags: []   # Readiness Check 의 "이상" 등급 항목 + grill 미수렴 플래그(presearch-grill-incomplete / gate2-grill-incomplete). 각 {flag, detail, resolution, ts}. resolution 없으면 미해결 진행.
+skip_presearch: 0     # pre-search grill 명시적 skip 시 +1 (Approval response rules)
+skip_gate2: 0         # Gate 2 Ambiguity 명시적 skip 시 +1 (SKIP behavior)
+gate_events:          # 게이트 별 결과 자동 기록. {gate, result, turns, self_pass, ts}. turns = 사용자 응답 메시지 수. gate 허용값: 0(align)/1/2/3.
+  - {gate: 0, result: ok, turns: 1, self_pass: false, ts: ...}
   - {gate: 1, result: ok, turns: 1, self_pass: true, ts: ...}
 intent_history: []    # intent.{problem,approach,why} 변경 이력. append-only. 각 {ts, field, prev_value, reason}. prev_value = 변경 전 텍스트 그대로 (hash 아님).
 risk_acks: []         # [!CAUTION] ack 결과. 각 {area, ack: confirmed|needs_check, ts}. area = baseline slug 또는 risk_areas: 의 +α slug.
@@ -393,7 +546,7 @@ risk_acks: []         # [!CAUTION] ack 결과. 각 {area, ack: confirmed|needs_c
 
 3. **Verbatim 잠금**: `user_prompt` = On activation step 3 의 원문, `intent.problem` = Readiness Check "문제 정의" 한 줄. 의역/풀어쓰기 금지. `intent.approach` / `intent.why` 는 Gate 2 결과로 spec-plan 이 생성.
 4. `docs_cited`: yaml docs 없으면 필드 자체 제거 (빈 배열 emit 금지).
-5. Telemetry 메타(`gate_events` / `intent_history` / `risk_acks` / `skip_grill_count`)는 spec-plan 이 자동 append.
+5. Telemetry 메타(`gate_events` / `intent_history` / `risk_acks` / `skip_presearch` / `skip_gate2`)는 spec-plan 이 자동 append.
 6. `/impl` 가 task 생성 시 `user_prompt` + `intent.problem` 을 task frontmatter (`intent_problem`) 로 복사, `plan_sha` 는 `git hash-object` 결과, `contributes_to` 는 분해 시점 자동 생성.
 7. Tell user: "Plan saved. Run `/impl {TICKET}` when ready."
 
