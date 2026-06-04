@@ -18,3 +18,6 @@ Use this workspace for code analysis, prompt experiments, and config management.
 ```
 notes/ → experiments/ → templates/ → claude-config/ → ~/.claude/ (via deploy.sh)
 ```
+
+## Implementation Config
+glossary_path: docs/glossary.md
