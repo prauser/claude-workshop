@@ -126,7 +126,11 @@ grill(
 - **Gate 2 / 3 한 단어 OK 거부**: "ok" / "go" / "네" 단독 응답은 거부하고 재질문. 사용자는 다음 둘 중 하나 형태로 응답해야 한다:
   - `"맞다"` + 무엇이 맞는지 한 줄 (예: "맞다. Impact Scope 의 3개 파일 정확함")
   - `"틀린 곳: ..."` + 어디가 틀렸는지
-- **`skip_grill_count` 카운터** — 사용자가 *명시적* skip 요청(예: `--skip-grill`, "건너뛰기", "grill 빼고") 또는 §Gate 2 "건너뛰기" 단축경로를 쓸 때만 plan.md frontmatter `skip_grill_count` 를 1 증가. 일반 "일괄 결정"(각 Ambiguity 에 explicit 응답을 모아 한 번에)은 정상 흐름이므로 카운트 X. PR 본문 주입 시 같이 노출.
+- **skip 카운터 (mode 별 분리)** — skip 요청 유형에 따라 카운터를 분리한다:
+  - **pre-search skip**: 사용자가 `--grill` 발동 후 *명시적* skip 요청(예: `--skip-grill`, "grill 빼고")을 하면 → plan.md frontmatter `skip_presearch` +1. Pre-search grill을 건너뛴 횟수.
+  - **Gate 2 ambiguity skip**: 사용자가 Gate 2 Ambiguity에 대해 §SKIP behavior 경로(Turn 7+ "skip" 또는 명시 `--skip-grill` / "건너뛰기")를 쓰면 → plan.md frontmatter `skip_gate2` +1. Gate 2 Ambiguity를 건너뛴 횟수.
+  - 일반 "일괄 결정"(각 Ambiguity 에 explicit 응답을 모아 한 번에)은 정상 흐름이므로 카운트 X.
+  - 두 카운터 모두 PR 본문 주입 시 노출.
 
 ## Self-pass turn
 
@@ -161,6 +165,31 @@ Gate 0 (align) 는 light gate 이므로 self-pass 는 "생략 가능" — 미결
 ## Gate 2 stuck detection — 5턴 힌트 + turn 6+ 형식 강제
 
 Gate 2 는 *상시 이해 게이트* (Plan / Ambiguity 결정). 5턴 힌트는 *별도 게이트 아님* — Gate 2 안의 stuck detection 안전판.
+
+### Gate 2 sequential 휴리스틱 (grill mode)
+
+Gate 2 Ambiguity 표를 제시하기 *전에*, LLM 이 각 항목을 자동 판정한다:
+
+> **판정 기준**: "이 Ambiguity 가 미결이면 작업 방향이 크게 바뀐다" — 예) 아키텍처 결정, 데이터 흐름 분기, 인터페이스 계약 변경 등.
+
+- **방향을 크게 바꾸는 항목** → grill 엔진 `grill` mode 로 sequential 처리 (one-at-a-time):
+
+  ```
+  grill(
+    mode:   grill
+    seed:   <해당 Ambiguity 항목>
+    cap:    3
+    output: ambiguity_decision
+  )
+  → 수렴 시: 항목 결정 기록.
+  → 미수렴(3웨이브) 시: readiness_flags += {flag: gate2-grill-incomplete, detail: "3웨이브 후 미수렴", ts: <ISO 8601>}
+  ```
+
+- **나머지 항목** → 기존 batch 표를 그대로 유지 (일괄 결정 허용).
+
+**주의**: 모든 Ambiguity 를 sequential 로 만들지 않는다. 방향을 좌우하는 항목 한정이므로 우회 유발이 낮다 (plan §4 다이얼).
+
+---
 
 ### Turn 1-4 (평시, 자유 응답)
 
@@ -212,7 +241,7 @@ Gate 2 는 *상시 이해 게이트* (Plan / Ambiguity 결정). 5턴 힌트는 *
    > "이 Ambiguity 는 Task {N} 분해에 *영향* — SKIP 시 {구체 항목}이 미정 상태로 implementer 에게 위임됨. 진짜 SKIP 하시겠습니까?"
    - 영향 없음 → 즉시 SKIP 처리
    - 영향 있음 → 사용자가 "응" 응답 필요. "아 그럼 결정" 응답 시 Ambiguity 로 복귀
-3. **카운터 +1** — `skip_grill_count` 1 증가. PR 본문 주입 시 노출.
+3. **카운터 +1** — `skip_gate2` 1 증가. PR 본문 주입 시 노출.
 4. **Open Question 마킹** — Open Questions 항목 끝에 `(skipped from Ambiguity #{N} at gate-2 turn {T})` 표시.
 
 implementer 가 SKIP 된 Open Question 을 만나면 자기 판단으로 결정하고 result `<decisions>` 에 한 줄 기록 — 일반 Open Question 처리 흐름과 동일.
@@ -482,7 +511,8 @@ intent:
 risk_areas: []        # +α slug 만 (baseline 5종 — memory/replication/concurrency/architecture/build-deploy — 은 preamble.md §8 하드코딩, 본 필드에 중복 X). 자유 추가 영역도 같은 kebab slug 형식.
 docs_cited: [ADR-014, CONV-007]   # omit 가능 — yaml docs 없을 때는 필드 자체 제거 (빈 배열 emit 금지)
 readiness_flags: []   # Readiness Check 의 "이상" 등급 항목. 각 {flag, detail, resolution, ts}. resolution 없으면 미해결 진행.
-skip_grill_count: 0   # 명시적 skip 요청 시에만 +1 (Approval response rules)
+skip_presearch: 0     # pre-search grill 명시적 skip 시 +1 (Approval response rules)
+skip_gate2: 0         # Gate 2 Ambiguity 명시적 skip 시 +1 (SKIP behavior)
 gate_events:          # 게이트 별 결과 자동 기록. {gate, result, turns, self_pass, ts}. turns = 사용자 응답 메시지 수. gate 허용값: 0(align)/1/2/3.
   - {gate: 0, result: ok, turns: 1, self_pass: false, ts: ...}
   - {gate: 1, result: ok, turns: 1, self_pass: true, ts: ...}
@@ -504,7 +534,7 @@ risk_acks: []         # [!CAUTION] ack 결과. 각 {area, ack: confirmed|needs_c
 
 3. **Verbatim 잠금**: `user_prompt` = On activation step 3 의 원문, `intent.problem` = Readiness Check "문제 정의" 한 줄. 의역/풀어쓰기 금지. `intent.approach` / `intent.why` 는 Gate 2 결과로 spec-plan 이 생성.
 4. `docs_cited`: yaml docs 없으면 필드 자체 제거 (빈 배열 emit 금지).
-5. Telemetry 메타(`gate_events` / `intent_history` / `risk_acks` / `skip_grill_count`)는 spec-plan 이 자동 append.
+5. Telemetry 메타(`gate_events` / `intent_history` / `risk_acks` / `skip_presearch` / `skip_gate2`)는 spec-plan 이 자동 append.
 6. `/impl` 가 task 생성 시 `user_prompt` + `intent.problem` 을 task frontmatter (`intent_problem`) 로 복사, `plan_sha` 는 `git hash-object` 결과, `contributes_to` 는 분해 시점 자동 생성.
 7. Tell user: "Plan saved. Run `/impl {TICKET}` when ready."
 
