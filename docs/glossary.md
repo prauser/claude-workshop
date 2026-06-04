@@ -65,9 +65,13 @@ plan.md frontmatter 와 본문 상단에 기록하는 6필드 블록(Feature / P
 
 spec-plan/impl 흐름에서 사람이 승인하는 지점. `gate_events:` frontmatter 슬롯에 게이트 번호, 결과(ok/abort), 대화 턴 수, 타임스탬프를 기록한다.
 
-## skip_grill_count
+## skip_presearch
 
-pre-search grill 을 건너뛴 횟수를 기록하는 plan.md frontmatter 필드. grill 스킵 빈도를 추적해 입력 품질 패턴을 파악하는 데 사용한다.
+pre-search grill(refine mode)을 건너뛴 횟수를 기록하는 plan.md frontmatter 필드. 사용자가 `--grill` 발동 후 명시적으로 grill을 skip한 경우에만 +1된다. 스킵 빈도가 높을수록 입력 품질(input quality)이 낮다는 신호로 해석한다.
+
+## skip_gate2
+
+Gate 2 ambiguity grill을 건너뛴 횟수를 기록하는 plan.md frontmatter 필드. Gate 2의 Ambiguity에 대해 SKIP 경로를 선택한 경우에만 +1된다. 스킵 빈도가 높을수록 모호성(ambiguity) 해소를 우회했다는 이해 우회 신호로 해석한다.
 
 ## risk_acks
 
