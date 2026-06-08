@@ -6,7 +6,7 @@ tools: Read, Glob, Grep
 
 Read-only. Never edit reviewed files.
 
-Path resolution: `templates/workflow-contract/...` 인용 시 cwd 우선, 부재하면 `$HOME/.claude/templates/workflow-contract/...`. 정책 SSOT: `claude-config/commands/impl.md` §Template path resolution.
+Path resolution: `templates/workflow-contract/...` 인용 시 `.claude/templates/workflow-contract/...` → cwd `./templates/workflow-contract/...` → `$HOME/.claude/templates/workflow-contract/...` 순. 정책 SSOT: `claude-config/commands/impl.md` §Template path resolution.
 Core test: "does this line change Claude's behavior?" — if not, cut it.
 
 ## Review checklist

@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>워크플로우 핸드북 · spec-plan / impl</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f1ede3; --paper2:#f7f4ec; --card:#fffdf8; --ink:#1b1c19; --ink2:#33352f;
+    --muted:#74766c; --faint:#9b9d92; --line:#ddd7c8; --line2:#e9e4d7;
+    --accent:#d8451f;        /* vermilion — primary signal */
+    --ok:#2f7d52;            /* alignment / good */
+    --warn:#b5790a;          /* caution */
+    --risk:#c23b2c;          /* friction / risk */
+    /* category hues (desaturated, editorial) */
+    --cA:#2f7d52; --cB:#2b6aa6; --cC:#c23b2c; --cD:#7a52b3; --cE:#b5790a; --cF:#0f8a8a; --cG:#b23a78;
+    --shadow:0 1px 0 rgba(0,0,0,.02), 0 12px 30px -18px rgba(40,30,10,.35);
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0; color:var(--ink); background:var(--paper);
+    font-family:"IBM Plex Sans KR",system-ui,sans-serif; font-weight:400; line-height:1.6; font-size:16px;
+    background-image:radial-gradient(var(--line) .8px, transparent .8px);
+    background-size:24px 24px; background-position:-12px -12px;
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:var(--accent); color:#fff;}
+  a{color:inherit;}
+  code,.mono{font-family:"IBM Plex Mono",ui-monospace,monospace;}
+  code{background:#efe9da; border:1px solid var(--line2); color:#5a3b1e; padding:.5px 6px; border-radius:5px; font-size:.82em;}
+
+  .shell{max-width:1180px; margin:0 auto; display:grid; grid-template-columns:248px 1fr; gap:0;}
+  /* sidebar */
+  nav{position:sticky; top:0; align-self:start; height:100vh; overflow-y:auto; padding:34px 22px 40px;
+      border-right:1px solid var(--line);}
+  nav .brand{font-family:"IBM Plex Mono"; font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); font-weight:600;}
+  nav .bk{font-weight:700; font-size:19px; margin:6px 0 2px; letter-spacing:-.02em;}
+  nav .bd{font-size:12.5px; color:var(--muted);}
+  nav .grp{font-family:"IBM Plex Mono"; font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--faint); margin:26px 0 8px;}
+  nav a{display:flex; align-items:center; gap:9px; text-decoration:none; color:var(--ink2); font-size:13.5px;
+        padding:5px 9px; border-radius:7px; transition:background .15s, color .15s;}
+  nav a:hover{background:var(--paper2); color:var(--accent);}
+  nav a .dot{width:8px; height:8px; border-radius:2px; flex:none;}
+
+  main{padding:0 14px;}
+  .pad{padding:46px 52px 90px;}
+  @media(max-width:920px){
+    .shell{grid-template-columns:1fr;}
+    nav{position:static; height:auto; border-right:none; border-bottom:1px solid var(--line); display:flex; flex-wrap:wrap; gap:4px 14px; align-items:center;}
+    nav .grp{display:none;} nav .brand,nav .bk,nav .bd{width:100%;}
+    .pad{padding:32px 22px 70px;}
+  }
+
+  /* hero */
+  .hero{padding:18px 0 14px;}
+  .eyebrow{font-family:"IBM Plex Mono"; font-size:11.5px; letter-spacing:.2em; text-transform:uppercase; color:var(--accent); font-weight:600;}
+  h1{font-size:clamp(34px,5vw,52px); line-height:1.02; letter-spacing:-.035em; font-weight:700; margin:14px 0 0;}
+  h1 .arr{color:var(--accent);}
+  .lede{font-size:18px; color:var(--ink2); max-width:60ch; margin:18px 0 0;}
+  .tags{display:flex; flex-wrap:wrap; gap:8px; margin-top:22px;}
+  .tag{font-family:"IBM Plex Mono"; font-size:11.5px; letter-spacing:.04em; padding:5px 11px; border:1px solid var(--line); border-radius:999px; background:var(--card); color:var(--ink2);}
+
+  section{margin-top:58px;}
+  .snum{font-family:"IBM Plex Mono"; font-size:12px; color:var(--accent); letter-spacing:.1em;}
+  h2{font-size:25px; letter-spacing:-.02em; font-weight:700; margin:6px 0 4px;}
+  .shint{color:var(--muted); font-size:14.5px; margin:0 0 20px;}
+
+  /* command cards */
+  .cmds{display:grid; grid-template-columns:repeat(2,1fr); gap:14px;}
+  @media(max-width:600px){.cmds{grid-template-columns:1fr;}}
+  .cmd{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px 20px; box-shadow:var(--shadow); transition:transform .18s, box-shadow .18s;}
+  .cmd:hover{transform:translateY(-3px); box-shadow:0 18px 40px -22px rgba(40,30,10,.45);}
+  .cmd .nm{font-family:"IBM Plex Mono"; font-weight:600; font-size:15.5px; color:var(--accent);}
+  .cmd .ro{font-size:14px; color:var(--ink2); margin:7px 0 0;}
+  .cmd .meta{font-size:12px; color:var(--faint); margin-top:10px; font-family:"IBM Plex Mono";}
+
+  /* pipeline */
+  .pipe{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px 22px; box-shadow:var(--shadow);}
+  .pipe + .pipe{margin-top:14px;}
+  .pipe .lbl{font-family:"IBM Plex Mono"; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); margin-bottom:12px;}
+  .row{display:flex; flex-wrap:wrap; align-items:center; gap:7px;}
+  .node{font-size:13px; padding:6px 12px; border-radius:8px; background:var(--paper2); border:1px solid var(--line); white-space:nowrap;}
+  .node.hot{border-color:var(--accent); color:var(--accent); font-weight:500;}
+  .node.soft{color:var(--muted); border-style:dashed;}
+  .sep{color:var(--faint); font-family:"IBM Plex Mono"; font-size:13px;}
+
+  /* device trio */
+  .trio{display:grid; grid-template-columns:repeat(3,1fr); gap:14px;}
+  @media(max-width:760px){.trio{grid-template-columns:1fr;}}
+  .dev{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:17px 19px; box-shadow:var(--shadow);}
+  .dev h4{margin:0 0 4px; font-size:15px; font-weight:600;}
+  .dev p{margin:0; font-size:13.5px; color:var(--ink2);}
+  .dev .k{font-family:"IBM Plex Mono"; font-size:11px; color:var(--accent); letter-spacing:.1em; text-transform:uppercase;}
+
+  /* category cards — the core */
+  .cat{background:var(--card); border:1px solid var(--line); border-left:5px solid var(--hue); border-radius:14px;
+       padding:18px 22px; box-shadow:var(--shadow); margin-bottom:13px; transition:transform .18s, box-shadow .18s;}
+  .cat:hover{transform:translateX(3px);}
+  .cat .top{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap;}
+  .cat .letter{font-family:"IBM Plex Mono"; font-weight:600; font-size:13px; color:#fff; background:var(--hue);
+               width:26px; height:26px; border-radius:7px; display:grid; place-items:center; flex:none; align-self:center;}
+  .cat .cname{font-size:17px; font-weight:700; letter-spacing:-.01em;}
+  .cat .means{font-size:14px; color:var(--ink2); margin:9px 0 0;}
+  .cat .fails{font-size:13px; color:var(--risk); margin:6px 0 0;}
+  .cat .fails b{font-family:"IBM Plex Mono"; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--risk); margin-right:6px;}
+  .fields{display:flex; flex-wrap:wrap; gap:6px; margin-top:12px;}
+  .fld{font-family:"IBM Plex Mono"; font-size:11.5px; padding:3px 9px; border-radius:6px; background:color-mix(in srgb, var(--hue) 11%, #fff); border:1px solid color-mix(in srgb, var(--hue) 28%, #fff); color:color-mix(in srgb, var(--hue) 65%, #000);}
+
+  .note{background:var(--paper2); border:1px solid var(--line); border-left:4px solid var(--accent); border-radius:0 10px 10px 0; padding:12px 16px; font-size:14px; color:var(--ink2); margin:16px 0;}
+  .note.ok{border-left-color:var(--ok);}
+  .note b{color:var(--ink);}
+
+  footer{margin-top:70px; padding-top:22px; border-top:1px solid var(--line); font-size:13px; color:var(--muted); font-family:"IBM Plex Mono";}
+  footer a{color:var(--accent); text-decoration:none;}
+
+  /* entrance animation */
+  @keyframes rise{from{opacity:0; transform:translateY(14px);} to{opacity:1; transform:none;}}
+  .reveal{animation:rise .6s cubic-bezier(.2,.7,.2,1) both;}
+  section.reveal{animation-delay:.05s;}
+  @media(prefers-reduced-motion:reduce){.reveal{animation:none;}}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<nav>
+  <div class="brand">Beta · Handbook</div>
+  <div class="bk">워크플로우</div>
+  <div class="bd">spec-plan → impl</div>
+
+  <div class="grp">읽기</div>
+  <a href="#cmds"><span class="dot" style="background:var(--accent)"></span>명령 4종</a>
+  <a href="#flow"><span class="dot" style="background:var(--ink2)"></span>전체 흐름</a>
+  <a href="#devices"><span class="dot" style="background:var(--muted)"></span>공통 장치</a>
+
+  <div class="grp">산출물 카테고리</div>
+  <a href="#cat-a"><span class="dot" style="background:var(--cA)"></span>A · 의도 보존</a>
+  <a href="#cat-b"><span class="dot" style="background:var(--cB)"></span>B · 게이트 텔레메트리</a>
+  <a href="#cat-c"><span class="dot" style="background:var(--cC)"></span>C · 위험 관리</a>
+  <a href="#cat-d"><span class="dot" style="background:var(--cD)"></span>D · 어휘 일관성</a>
+  <a href="#cat-e"><span class="dot" style="background:var(--cE)"></span>E · 추적성·드리프트</a>
+  <a href="#cat-f"><span class="dot" style="background:var(--cF)"></span>F · 증거</a>
+  <a href="#cat-g"><span class="dot" style="background:var(--cG)"></span>G · 품질 라우팅</a>
+</nav>
+
+<main>
+<div class="pad">
+
+  <!-- HERO -->
+  <header class="hero reveal">
+    <div class="eyebrow">베타 워크플로우 핸드북</div>
+    <h1>spec&#8209;plan <span class="arr">→</span> impl</h1>
+    <p class="lede">사람과 <b>합의된 계획</b>(plan)을 만들고, 그 계획을 작은 task로 쪼개 <b>구현·리뷰·통합</b>한다. AI가 의도를 조용히 바꾸거나 게이트를 우회하지 못하게 막고, 모든 결정에 증거를 남긴다.</p>
+    <div class="tags">
+      <span class="tag">읽기전용 계획</span>
+      <span class="tag">위임 기반 구현</span>
+      <span class="tag">게이트 합의</span>
+      <span class="tag">증거 + 텔레메트리</span>
+    </div>
+  </header>
+
+  <!-- 1 · COMMANDS -->
+  <section id="cmds" class="reveal">
+    <div class="snum">01</div>
+    <h2>명령 4종</h2>
+    <p class="shint">무게중심은 <code>/spec-plan</code> · <code>/impl</code>. 나머지 둘은 1회성 설정·관리.</p>
+    <div class="cmds">
+      <div class="cmd">
+        <div class="nm">/spec-plan {TICKET}</div>
+        <div class="ro">티켓·요청 → <b>합의된 계획</b>. 모든 서브에이전트 읽기전용, 코드 안 씀.</div>
+        <div class="meta">게이트 기반 · 계획만</div>
+      </div>
+      <div class="cmd">
+        <div class="nm">/impl {TICKET}</div>
+        <div class="ro">계획 → <b>구현</b>. 직접 코딩 안 하고 전문 에이전트에 위임.</div>
+        <div class="meta">오케스트레이션 · 위임</div>
+      </div>
+      <div class="cmd">
+        <div class="nm">/init-docs</div>
+        <div class="ro">ADR·conventions·glossary 문서를 1회 부트스트랩.</div>
+        <div class="meta">opt-in 설정</div>
+      </div>
+      <div class="cmd">
+        <div class="nm">/idiom-review</div>
+        <div class="ro">누적된 어휘 후보를 사람이 1건씩 GLOSSARY 등록·아카이브.</div>
+        <div class="meta">어휘 관리</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 · FLOW -->
+  <section id="flow" class="reveal">
+    <div class="snum">02</div>
+    <h2>전체 흐름</h2>
+    <p class="shint">계획은 게이트로 합의되고, 구현은 위임으로 굴러간다. <span class="mono" style="color:var(--accent)">붉은 노드</span> = 사람 승인 지점.</p>
+    <div class="pipe">
+      <div class="lbl">/spec-plan — 계획 (읽기전용)</div>
+      <div class="row">
+        <span class="node">준비도 점검</span><span class="sep">›</span>
+        <span class="node soft">grill 정련</span><span class="sep">›</span>
+        <span class="node">컨텍스트 수집 ×5</span><span class="sep">›</span>
+        <span class="node hot">Gate 0 정렬</span><span class="sep">›</span>
+        <span class="node hot">Gate 1 요구</span><span class="sep">›</span>
+        <span class="node hot">Gate 2 계획·모호점</span><span class="sep">›</span>
+        <span class="node hot">Gate 3 테스트</span><span class="sep">›</span>
+        <span class="node">plan.md</span>
+      </div>
+    </div>
+    <div class="pipe">
+      <div class="lbl">/impl — 구현 (위임)</div>
+      <div class="row">
+        <span class="node">plan.md 로드</span><span class="sep">›</span>
+        <span class="node">task 분해</span><span class="sep">›</span>
+        <span class="node">implementer</span><span class="sep">›</span>
+        <span class="node">reviewer</span><span class="sep">↻</span>
+        <span class="node soft">needs-fix 최대 3R</span><span class="sep">›</span>
+        <span class="node">commit</span><span class="sep">›</span>
+        <span class="node">integrator</span>
+      </div>
+    </div>
+    <div class="note"><b>이해 마찰은 한 곳에.</b> Gate 0·1·3은 <code>bare OK</code>로 가볍게 — 내용 정렬은 grill <code>align</code> diff와 cross-review가 검증한다. 복사로 못 뚫는 <b>단일 프로브</b>는 <b>Gate 2 Spec Preview</b> 한 곳에 집중: "맞다" 복붙이 아니라 화면에 없는 걸 답하게 한다(why-not / 예측 / 범위 판정).</div>
+  </section>
+
+  <!-- 3 · DEVICES -->
+  <section id="devices" class="reveal">
+    <div class="snum">03</div>
+    <h2>공통 장치</h2>
+    <p class="shint">두 명령이 공유하는 SSOT. 변경하면 <code>./deploy.sh</code>로 <code>~/.claude/</code>에 반영.</p>
+    <div class="trio">
+      <div class="dev">
+        <div class="k">grill</div>
+        <h4>한 번에 한 질문</h4>
+        <p>모호한 입력을 멀티턴 인터뷰로 좁힌다. 4 mode(align·refine·elicit·grill), 웨이브 최대 3, 정렬되면 조기 종료.</p>
+      </div>
+      <div class="dev">
+        <div class="k">preamble §8</div>
+        <h4>위험영역 회피 금지</h4>
+        <p>memory·replication·concurrency·architecture·build-deploy에 닿으면 <code>[!CAUTION]</code> 박스 강제. 회피 불가.</p>
+      </div>
+      <div class="dev">
+        <div class="k">preamble §9</div>
+        <h4>한글 순화</h4>
+        <p>자연 대응어가 있으면 한글로(예: stale→오래된), 첫 약어는 한 줄 풀이. 우선순위: GLOSSARY › §9 › 휴리스틱.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 · OUTPUT CATEGORIES (CORE) -->
+  <section class="reveal">
+    <div class="snum">04 · 핵심</div>
+    <h2>산출물 7 카테고리 — 왜 필요한가</h2>
+    <p class="shint">계획·코드 외에 강제되는 메타데이터. 얼핏 과해 보이지만 <b>각각 특정 실패 모드</b>를 막는다. 카테고리별로 분리해 확인하라.</p>
+
+    <div class="cat" id="cat-a" style="--hue:var(--cA)">
+      <div class="top"><span class="letter">A</span><span class="cname">의도 보존</span></div>
+      <div class="means">AI가 사용자 의도를 조용히 의역하지 못하게 잠근다. 원문이 task마다 복사돼 기준점이 사라지지 않음.</div>
+      <div class="fails"><b>막는 실패</b>의도 표류 — 그럴듯하지만 내가 원한 게 아닌 걸 정확히 구현, 끝나서야 발견</div>
+      <div class="fields"><span class="fld">user_prompt</span><span class="fld">refined_user_prompt</span><span class="fld">intent.problem</span><span class="fld">intent_history</span><span class="fld">intent_problem</span><span class="fld">contributes_to</span></div>
+    </div>
+
+    <div class="cat" id="cat-b" style="--hue:var(--cB)">
+      <div class="top"><span class="letter">B</span><span class="cname">게이트 텔레메트리</span></div>
+      <div class="means">합의가 얼마나 매끄러웠는지·어디서 우회했는지 숫자로 남긴다. 워크플로우 자체를 개선하기 위한 계기판.</div>
+      <div class="fails"><b>막는 실패</b>죽은 게이트 — 다들 "ok"로 스킵해 정렬 장치가 형식만 남는 것</div>
+      <div class="fields"><span class="fld">gate_events.turns</span><span class="fld">gate_events.probe</span><span class="fld">skip_presearch</span><span class="fld">skip_gate2</span><span class="fld">readiness_flags</span><span class="fld">gate2-comprehension-incomplete</span></div>
+    </div>
+
+    <div class="cat" id="cat-c" style="--hue:var(--cC)">
+      <div class="top"><span class="letter">C</span><span class="cname">위험 관리</span></div>
+      <div class="means">위험영역에 닿으면 회피·은폐 못 하고 띄워 확인받는다. <code>needs_check</code>면 status를 partial로 강등.</div>
+      <div class="fails"><b>막는 실패</b>위험 은폐 — 위험 코드를 말없이 바꾸거나 "범위 밖"으로 회피</div>
+      <div class="fields"><span class="fld">risk_areas</span><span class="fld">risk_acks</span><span class="fld">[!CAUTION]</span></div>
+    </div>
+
+    <div class="cat" id="cat-d" style="--hue:var(--cD)">
+      <div class="top"><span class="letter">D</span><span class="cname">어휘 일관성</span></div>
+      <div class="means">같은 개념을 매번 다른(또는 영어) 단어로 쓰지 않게. 어쩔 수 없이 어긴 어휘는 사람이 볼 큐에 쌓는다.</div>
+      <div class="fails"><b>막는 실패</b>용어 표류 — 영어 범벅으로 주니어가 못 읽음</div>
+      <div class="fields"><span class="fld">idiom_candidates</span><span class="fld">idiom-pool</span><span class="fld">GLOSSARY hit</span></div>
+    </div>
+
+    <div class="cat" id="cat-e" style="--hue:var(--cE)">
+      <div class="top"><span class="letter">E</span><span class="cname">추적성 · 드리프트</span></div>
+      <div class="means">구현 중 계획이 바뀌면 task가 옛 계획대로 굴러가는 걸 감지해 알린다.</div>
+      <div class="fails"><b>막는 실패</b>계획 표류 — 끝나고 보니 plan과 코드가 따로 노는 것</div>
+      <div class="fields"><span class="fld">plan_sha</span><span class="fld">plan_deviations</span></div>
+    </div>
+
+    <div class="cat" id="cat-f" style="--hue:var(--cF)">
+      <div class="top"><span class="letter">F</span><span class="cname">증거</span></div>
+      <div class="means">"됐다"는 주장에 실행 가능한 근거를 붙인다. diff의 모든 변경 파일은 task가 선언·검증해야 함.</div>
+      <div class="fails"><b>막는 실패</b>검증 불가 완료 — "테스트 통과"라는 말만 있고 흔적이 없음</div>
+      <div class="fields"><span class="fld">AC = bash</span><span class="fld">test-output.log</span><span class="fld">diff.patch</span><span class="fld">status 머신</span><span class="fld">manifest · quality_gates</span></div>
+    </div>
+
+    <div class="cat" id="cat-g" style="--hue:var(--cG)">
+      <div class="top"><span class="letter">G</span><span class="cname">품질 라우팅</span></div>
+      <div class="means">리뷰 지적을 우선순위로 분류해 차단급(p1·p2)만 되돌린다. p3·p4는 follow-up으로 흘림.</div>
+      <div class="fails"><b>막는 실패</b>무한 핑퐁 — 사소한 nit까지 고치느라 비용 폭발</div>
+      <div class="fields"><span class="fld">p1–p4</span><span class="fld">side_effect</span><span class="fld">intent_check</span></div>
+    </div>
+
+    <div class="note ok"><b>핵심.</b> 이 7개는 "관료주의"가 아니라 7개의 안전망이다. 각 칸은 위에서 봤던 한 가지 실패를 막는다 — 피드백을 줄 때 "이 안전망이 실제로 작동했나?"를 기준으로 보면 된다.</div>
+  </section>
+
+  <footer>
+    소스 · claude-config/commands · templates/workflow-contract<br>
+    함께 보기 → <a href="beta-feedback-guide.html">베타 피드백 가이드 →</a>
+  </footer>
+
+</div>
+</main>
+</div>
+</body>
+</html>
