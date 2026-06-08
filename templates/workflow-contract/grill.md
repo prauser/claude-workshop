@@ -39,7 +39,7 @@ Grill 엔진은 **one-at-a-time(한 번에 한 질문) 멀티턴 인터뷰 루�
 - **씨앗**: 사용자가 입력한 "문제 한 줄"과 Step 0 탐색이 발견한 내용.
 - **목표**: 사용자 의도와 AI 이해가 일치하는지 확인. 불일치 발견 시 diff를 사용자에게 제시하고 확정받는다.
 - **산출물**: 일치 확인 기록. 사용자가 직접 확정한 경우에만 `intent.problem` 갱신 + `intent_history` 항목 추가.
-- **강도**: light — 1~2질문으로 짧게 닫는다. Gate 0는 Gate 2보다 관문이 낮다. Gate 0 승인 형식은 "맞다+한줄" — bare OK 불가 (Gate 1=bare OK < Gate 0=맞다+한줄 < Gate 2/3=맞다+근거).
+- **강도**: light — 1~2질문으로 짧게 닫는다. **diff는 real-fork로 제시(유도형 질문 금지)** — 양쪽을 깔고 AI lean을 보류해 사용자가 직접 고르게 한다. **Gate 0 승인 형식은 bare OK** — 내용 정렬은 이 align 메커니즘이 수행하고, 이해(comprehension) 검증은 Gate 2 Spec Preview 한 곳에 집중한다 (spec-plan.md §Approval response rules · §Spec Preview).
 - **갱신 3조건** (모두 충족해야 갱신 가능):
   1. Gate 0 대화에서 사용자가 "문제 한 줄을 X로" 직접 확정.
   2. `intent_history`에 `{ts, field: problem, prev_value, reason}` 추가(변경 이력 보존).
@@ -88,7 +88,7 @@ Grill 엔진은 **one-at-a-time(한 번에 한 질문) 멀티턴 인터뷰 루�
   → 다음 질문 또는 종료
 ```
 
-단순 OK/PASS가 아니라 이해 확인(comprehension check)이 목적이다. 원형: `spec-plan.md:122–136` turn 5 양방향 루프.
+단순 OK/PASS가 아니라 이해 확인(comprehension check)이 목적이다. 원형: `spec-plan.md` §Turn 5 — Stuck 진단 + bi-directional check.
 
 ### 3.3 캡 + 자연종료 (wave cap + early exit)
 
@@ -152,7 +152,7 @@ grill(mode: align, seed: "문제 한 줄 ↔ Step 0 findings", cap: small, outpu
 → 미수렴 시: 호출자 자체 판단
 ```
 
-**경로 해석(template path resolution)**: 호출자는 cwd의 `templates/workflow-contract/grill.md`를 우선 확인하고, 없으면 `~/.claude/templates/workflow-contract/grill.md`로 폴백한다. 파일이 두 경로 모두에 없으면 "deploy.sh 미실행" 경고를 출력하고 중단한다 (`impl.md:7-15` 동형 규칙).
+**경로 해석(template path resolution)**: `.claude/templates/workflow-contract/grill.md` → cwd `./templates/workflow-contract/grill.md` → `~/.claude/templates/workflow-contract/grill.md` 순으로 처음 존재하는 것을 사용. 셋 다 없으면 "sync-workflow.sh / deploy.sh 미실행" 경고 후 중단 (`impl.md` §Template path resolution 동형).
 
 ---
 

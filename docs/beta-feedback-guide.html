@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>베타 피드백 가이드 · spec-plan / impl</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f1ede3; --paper2:#f7f4ec; --card:#fffdf8; --ink:#1b1c19; --ink2:#33352f;
+    --muted:#74766c; --faint:#9b9d92; --line:#ddd7c8; --line2:#e9e4d7;
+    --accent:#d8451f; --ok:#2f7d52; --warn:#b5790a; --risk:#c23b2c;
+    --cA:#2f7d52; --cB:#2b6aa6; --cC:#c23b2c; --cD:#7a52b3; --cE:#b5790a; --cF:#0f8a8a; --cG:#b23a78; --cH:#5a6470;
+    --shadow:0 1px 0 rgba(0,0,0,.02), 0 12px 30px -18px rgba(40,30,10,.35);
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0; color:var(--ink); background:var(--paper);
+    font-family:"IBM Plex Sans KR",system-ui,sans-serif; line-height:1.6; font-size:16px;
+    background-image:radial-gradient(var(--line) .8px, transparent .8px);
+    background-size:24px 24px; background-position:-12px -12px; -webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:var(--accent); color:#fff;}
+  code,.mono{font-family:"IBM Plex Mono",ui-monospace,monospace;}
+  code{background:#efe9da; border:1px solid var(--line2); color:#5a3b1e; padding:.5px 6px; border-radius:5px; font-size:.82em;}
+
+  .shell{max-width:1180px; margin:0 auto; display:grid; grid-template-columns:248px 1fr;}
+  nav{position:sticky; top:0; align-self:start; height:100vh; overflow-y:auto; padding:34px 22px 40px; border-right:1px solid var(--line);}
+  nav .brand{font-family:"IBM Plex Mono"; font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); font-weight:600;}
+  nav .bk{font-weight:700; font-size:19px; margin:6px 0 2px; letter-spacing:-.02em;}
+  nav .bd{font-size:12.5px; color:var(--muted);}
+  nav .grp{font-family:"IBM Plex Mono"; font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--faint); margin:26px 0 8px;}
+  nav a{display:flex; align-items:center; gap:9px; text-decoration:none; color:var(--ink2); font-size:13.5px; padding:5px 9px; border-radius:7px; transition:background .15s,color .15s;}
+  nav a:hover{background:var(--paper2); color:var(--accent);}
+  nav a .dot{width:8px; height:8px; border-radius:2px; flex:none;}
+
+  main{padding:0 14px;}
+  .pad{padding:46px 52px 90px;}
+  @media(max-width:920px){
+    .shell{grid-template-columns:1fr;}
+    nav{position:static; height:auto; border-right:none; border-bottom:1px solid var(--line); display:flex; flex-wrap:wrap; gap:4px 14px; align-items:center;}
+    nav .grp{display:none;} nav .brand,nav .bk,nav .bd{width:100%;}
+    .pad{padding:32px 22px 70px;}
+  }
+
+  .hero{padding:18px 0 8px;}
+  .eyebrow{font-family:"IBM Plex Mono"; font-size:11.5px; letter-spacing:.2em; text-transform:uppercase; color:var(--accent); font-weight:600;}
+  h1{font-size:clamp(32px,4.6vw,48px); line-height:1.05; letter-spacing:-.03em; font-weight:700; margin:14px 0 0;}
+  .lede{font-size:18px; color:var(--ink2); max-width:62ch; margin:18px 0 0;}
+
+  section{margin-top:54px;}
+  .snum{font-family:"IBM Plex Mono"; font-size:12px; color:var(--accent); letter-spacing:.1em;}
+  h2{font-size:24px; letter-spacing:-.02em; font-weight:700; margin:6px 0 4px;}
+  .shint{color:var(--muted); font-size:14.5px; margin:0 0 20px; max-width:64ch;}
+
+  /* the one question — banner */
+  .banner{background:linear-gradient(180deg,#fffdf8,#fbf7ee); border:1px solid var(--line); border-top:4px solid var(--accent);
+          border-radius:16px; padding:26px 28px; box-shadow:var(--shadow); margin-top:26px;}
+  .banner .q{font-family:"IBM Plex Mono"; font-size:11.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent);}
+  .banner .big{font-size:23px; font-weight:700; letter-spacing:-.015em; margin:10px 0 0; line-height:1.35;}
+  .banner .big u{text-decoration-color:var(--accent); text-underline-offset:4px;}
+  .banner .small{font-size:14px; color:var(--ink2); margin:12px 0 0;}
+
+  /* counterfactual triplet */
+  .cf{display:grid; grid-template-columns:repeat(3,1fr); gap:13px; margin-top:18px;}
+  @media(max-width:760px){.cf{grid-template-columns:1fr;}}
+  .cf .c{background:var(--card); border:1px solid var(--line); border-radius:13px; padding:16px 18px; box-shadow:var(--shadow);}
+  .cf .c .h{font-weight:700; font-size:15px; display:flex; align-items:center; gap:8px;}
+  .cf .c.win .h{color:var(--ok);} .cf .c.miss .h{color:var(--risk);} .cf .c.fp .h{color:var(--warn);}
+  .cf .c p{font-size:13px; color:var(--ink2); margin:8px 0 0;}
+  .cf .c .ex{font-family:"IBM Plex Mono"; font-size:11.5px; color:var(--muted); margin-top:8px; display:block; line-height:1.5;}
+
+  /* before/after */
+  .ba{width:100%; border-collapse:collapse; font-size:14px; background:var(--card); border:1px solid var(--line); border-radius:13px; overflow:hidden; box-shadow:var(--shadow);}
+  .ba th{font-family:"IBM Plex Mono"; font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; text-align:left; padding:11px 16px; background:var(--paper2); color:var(--muted); font-weight:600;}
+  .ba td{padding:11px 16px; border-top:1px solid var(--line2); vertical-align:top;}
+  .ba td:first-child{color:var(--risk); width:42%;}
+  .ba td:nth-child(2){color:var(--ink2);}
+  .ba td:last-child{font-family:"IBM Plex Mono"; font-size:12px; color:var(--accent); width:60px; text-align:center;}
+
+  /* watch grid */
+  .watch{display:grid; grid-template-columns:repeat(2,1fr); gap:13px;}
+  @media(max-width:680px){.watch{grid-template-columns:1fr;}}
+  .w{background:var(--card); border:1px solid var(--line); border-left:5px solid var(--hue); border-radius:13px; padding:16px 19px; box-shadow:var(--shadow); transition:transform .16s;}
+  .w:hover{transform:translateY(-3px);}
+  .w .wt{display:flex; align-items:baseline; gap:9px;}
+  .w .no{font-family:"IBM Plex Mono"; font-weight:600; color:var(--hue); font-size:14px;}
+  .w .nm{font-weight:700; font-size:15.5px;}
+  .w .tgt{font-size:13px; color:var(--ink2); margin:8px 0 0;}
+  .w .tgt b{font-family:"IBM Plex Mono"; font-size:10.5px; letter-spacing:.05em; text-transform:uppercase; color:var(--risk); margin-right:5px;}
+  .w .ask{font-size:13.5px; color:var(--ink); margin:10px 0 0; padding-left:18px; position:relative;}
+  .w .ask:before{content:"›"; position:absolute; left:2px; color:var(--accent); font-weight:700;}
+
+  /* priority */
+  .rank{display:grid; gap:8px;}
+  .rk{display:flex; align-items:center; gap:13px; background:var(--card); border:1px solid var(--line); border-radius:11px; padding:11px 16px; box-shadow:var(--shadow);}
+  .rk .n{font-family:"IBM Plex Mono"; font-weight:600; font-size:14px; color:#fff; background:var(--accent); width:24px; height:24px; border-radius:6px; display:grid; place-items:center; flex:none;}
+  .rk .n.mut{background:var(--faint);}
+  .rk .t{font-size:14.5px;} .rk .t b{font-weight:600;}
+  .rk .tag{margin-left:auto; font-family:"IBM Plex Mono"; font-size:11px; color:var(--muted);}
+
+  /* template */
+  pre{background:#211f1a; color:#e9e3d2; border-radius:14px; padding:20px 22px; overflow-x:auto; font-family:"IBM Plex Mono"; font-size:12.5px; line-height:1.7; box-shadow:var(--shadow); border:1px solid #2c2a23;}
+  pre .c{color:#8f897a;} pre .k{color:#f0a07a;} pre .s{color:#9bd6a0;}
+
+  footer{margin-top:66px; padding-top:22px; border-top:1px solid var(--line); font-size:13px; color:var(--muted); font-family:"IBM Plex Mono";}
+  footer a{color:var(--accent); text-decoration:none;}
+
+  @keyframes rise{from{opacity:0; transform:translateY(14px);} to{opacity:1; transform:none;}}
+  .reveal{animation:rise .6s cubic-bezier(.2,.7,.2,1) both;}
+  @media(prefers-reduced-motion:reduce){.reveal{animation:none;}}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<nav>
+  <div class="brand">Beta · Feedback</div>
+  <div class="bk">피드백 가이드</div>
+  <div class="bd">무엇을 보고, 무엇을 알려줄까</div>
+
+  <div class="grp">먼저</div>
+  <a href="#one"><span class="dot" style="background:var(--accent)"></span>가치 증명 질문</a>
+  <a href="#log"><span class="dot" style="background:var(--ok)"></span>반례 로그</a>
+  <a href="#ba"><span class="dot" style="background:var(--ink2)"></span>안 쓸 때 vs 쓸 때</a>
+
+  <div class="grp">유념해서 볼 8</div>
+  <a href="#watch"><span class="dot" style="background:var(--cB)"></span>관찰 영역</a>
+
+  <div class="grp">정리</div>
+  <a href="#priority"><span class="dot" style="background:var(--accent)"></span>우선순위</a>
+  <a href="#template"><span class="dot" style="background:var(--muted)"></span>리포트 템플릿</a>
+</nav>
+
+<main>
+<div class="pad">
+
+  <header class="hero reveal">
+    <div class="eyebrow">베타 피드백 가이드</div>
+    <h1>무엇을 보고,<br>무엇을 알려줄까</h1>
+    <p class="lede">동작 설명은 <a href="workflow-guide.html" style="color:var(--accent)">워크플로우 핸드북</a>에. 여기서는 <b>어디를 관찰하고 무슨 피드백이 필요한지</b>만 — 짧게.</p>
+  </header>
+
+  <!-- ONE QUESTION -->
+  <section id="one" class="reveal">
+    <div class="banner">
+      <div class="q">가치를 증명하는 단 하나</div>
+      <p class="big">이 워크플로우의 가치는 "있어서 편하다"가 아니라<br><u>"없었으면 이 실수를 했을 것이다"</u>로만 증명된다.</p>
+      <p class="small">핵심 축: <b style="color:var(--ok)">정렬</b>(의도대로 일하게) ⟷ <b style="color:var(--risk)">마찰</b>(번거로워 우회하게). 모든 피드백을 이 축 위에서 생각하세요. 당신의 우회는 "잘못"이 아니라 <b>설계 입력</b>입니다.</p>
+    </div>
+  </section>
+
+  <!-- COUNTERFACTUAL LOG -->
+  <section id="log" class="reveal">
+    <div class="snum">01 · 최우선</div>
+    <h2>반례 로그 — 매 세션 1개</h2>
+    <p class="shint">이 하나가 다른 모든 피드백보다 값집니다. 세션이 끝나면 셋 중 최소 하나를 남기세요.</p>
+    <div class="cf">
+      <div class="c win">
+        <div class="h">✅ 막아준 실수</div>
+        <p>없었으면 했을 실수를 워크플로우가 잡았다.</p>
+        <span class="ex">없었으면 ___ 했을 텐데 / ___ 장치가 / ___ 시점에 잡음</span>
+      </div>
+      <div class="c miss">
+        <div class="h">❌ 놓친 실수</div>
+        <p>막았어야 했는데 그냥 통과했다.</p>
+        <span class="ex">___ 를 막았어야 / 통과됨 / ___ 에서 뒤늦게 발견</span>
+      </div>
+      <div class="c fp">
+        <div class="h">➖ 헛수고</div>
+        <p>멈춰 세웠지만 실제 위험은 없었다 (false positive).</p>
+        <span class="ex">___ 가 멈춰 세움 / 그러나 위험 없었음</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- BEFORE / AFTER -->
+  <section id="ba" class="reveal">
+    <div class="snum">02</div>
+    <h2>안 쓸 때 vs 쓸 때</h2>
+    <p class="shint">워크플로우를 <b>안 쓰면</b> 기본값으로 나는 실패와, <b>쓰면</b> 느껴야 하는 것. 각 영역은 "이 전환이 실제로 일어났나?"를 확인하는 것.</p>
+    <table class="ba">
+      <thead><tr><th>안 쓸 때 (기본값)</th><th>쓸 때 느껴야 하는 것</th><th>영역</th></tr></thead>
+      <tbody>
+        <tr><td>의도 표류 — 끝나서야 "이게 아닌데"</td><td>다르게 해석하려 하면 먼저 확인</td><td>④</td></tr>
+        <tr><td>성급한 코딩 — 추측으로 빈칸 메움</td><td>모호함을 코딩 전에 꺼내 보여줌</td><td>①②</td></tr>
+        <tr><td>빈 합의 — "응 좋아" 하고 안 그려봄</td><td>결정 조합 읽다 내가 틀린 걸 잡음</td><td>①</td></tr>
+        <tr><td>위험 은폐 — 말없이 바꾸거나 회피</td><td>위험에 닿으면 회피 못 하고 확인받음</td><td>⑥</td></tr>
+        <tr><td>증거 없는 완료 — "통과했다"는 말뿐</td><td>'됐다'에 실행 가능한 근거가 붙음</td><td>⑦</td></tr>
+        <tr><td>핑퐁·표류 — 비용 폭발 / 계획 어긋남</td><td>중요한 것만 멈추고, 표류를 알림</td><td>⑦</td></tr>
+        <tr><td>블랙박스 — 우회해도 기록이 없음</td><td>헤맨 지점이 숫자로 남아 개선됨</td><td>③⑤</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- WATCH 8 -->
+  <section id="watch" class="reveal">
+    <div class="snum">03</div>
+    <h2>유념해서 볼 8가지</h2>
+    <p class="shint">각 카드 = <b style="color:var(--risk)">막는 실패</b> 한 줄 + 핵심 질문. 해당하는 것만 답해도 됩니다.</p>
+    <div class="watch">
+      <div class="w" style="--hue:var(--cB)">
+        <div class="wt"><span class="no">①</span><span class="nm">게이트 마찰</span></div>
+        <div class="tgt"><b>막는 실패</b>빈 합의</div>
+        <div class="ask">Spec Preview 단일 프로브(why-not/예측/범위)가 실수를 잡았나, 타이핑만 늘렸나?</div>
+        <div class="ask">프로브 답하다 "어 이게 아닌데"를 잡은 적?</div>
+      </div>
+      <div class="w" style="--hue:var(--cF)">
+        <div class="wt"><span class="no">②</span><span class="nm">grill 인터뷰</span></div>
+        <div class="tgt"><b>막는 실패</b>성급한 코딩</div>
+        <div class="ask">한 번에 하나가 batch보다 나았나, 답답했나?</div>
+        <div class="ask">질문이 핵심을 찔렀나, 변죽을 울렸나?</div>
+      </div>
+      <div class="w" style="--hue:var(--cH)">
+        <div class="wt"><span class="no">③</span><span class="nm">우회 충동</span></div>
+        <div class="tgt"><b>막는 실패</b>블랙박스</div>
+        <div class="ask">어디서 우회하고 싶었나? 멈춘 게 옳았나 과했나?</div>
+        <div class="ask">프로브 답을 화면에서 복사해 통과시킨 적?</div>
+      </div>
+      <div class="w" style="--hue:var(--cA)">
+        <div class="wt"><span class="no">④</span><span class="nm">의도 보존</span></div>
+        <div class="tgt"><b>막는 실패</b>의도 표류</div>
+        <div class="ask">AI가 다르게 해석한 순간, 잡았나 놓쳤나?</div>
+        <div class="ask">"내가 확정해야 바뀐다"가 안전망이었나 마찰이었나?</div>
+      </div>
+      <div class="w" style="--hue:var(--cD)">
+        <div class="wt"><span class="no">⑤</span><span class="nm">산출물 무게</span></div>
+        <div class="tgt"><b>막는 실패</b>짐이 된 자기측정</div>
+        <div class="ask">한 번도 안 본 frontmatter 필드는?</div>
+        <div class="ask">반대로 "있었으면" 한 누락 정보는?</div>
+      </div>
+      <div class="w" style="--hue:var(--cC)">
+        <div class="wt"><span class="no">⑥</span><span class="nm">위험 · 순화</span></div>
+        <div class="tgt"><b>막는 실패</b>위험 은폐</div>
+        <div class="ask">위험 경고가 헛발질(FP)? 정확히 잡은 사례?</div>
+        <div class="ask">한글 순화 중 어색·틀린 번역이 있었나?</div>
+      </div>
+      <div class="w" style="--hue:var(--cE)">
+        <div class="wt"><span class="no">⑦</span><span class="nm">신뢰성 · 드리프트</span></div>
+        <div class="tgt"><b>막는 실패</b>검증불가 · 핑퐁 · 표류</div>
+        <div class="ask">reviewer 우선순위(p1–p4) 오분류 사례?</div>
+        <div class="ask">계획이 바뀌었을 때 drift를 잡아줬나?</div>
+      </div>
+      <div class="w" style="--hue:var(--cG)">
+        <div class="wt"><span class="no">⑧</span><span class="nm">runner · 비용</span></div>
+        <div class="tgt"><b>막는 실패</b>조용한 fallback</div>
+        <div class="ask">preset의 비용·품질 체감은?</div>
+        <div class="ask">fallback 금지로 멈췄을 때 안내가 명확했나?</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRIORITY -->
+  <section id="priority" class="reveal">
+    <div class="snum">04</div>
+    <h2>시간이 없다면 — 위에서부터</h2>
+    <p class="shint">위쪽이 워크플로우의 생사를 가르는 질문입니다.</p>
+    <div class="rank">
+      <div class="rk"><span class="n">1</span><span class="t"><b>반례</b> — 막아준 / 놓친 실수</span><span class="tag">§01</span></div>
+      <div class="rk"><span class="n">2</span><span class="t"><b>정렬 vs 마찰</b> — 잡은 순간 vs 우회하고 싶은 순간</span><span class="tag">①③</span></div>
+      <div class="rk"><span class="n">3</span><span class="t"><b>의도 일치</b> — 최종 결과가 의도와 같았나</span><span class="tag">④</span></div>
+      <div class="rk"><span class="n mut">4</span><span class="t">grill 효과 · 산출물 무게</span><span class="tag">②⑤</span></div>
+      <div class="rk"><span class="n mut">5</span><span class="t">impl 신뢰성 · 드리프트</span><span class="tag">⑦</span></div>
+      <div class="rk"><span class="n mut">6</span><span class="t">위험 · 순화 · 비용</span><span class="tag">⑥⑧</span></div>
+    </div>
+  </section>
+
+  <!-- TEMPLATE -->
+  <section id="template" class="reveal">
+    <div class="snum">05</div>
+    <h2>리포트 템플릿</h2>
+    <p class="shint">복붙해서 채우세요. ★ 반례 로그가 최우선.</p>
+<pre><span class="c">## 세션</span>
+- 명령:  <span class="k">/spec-plan</span> | <span class="k">/impl</span>   성격: 버그/신기능/리팩터
+- runner/preset:  in-session | cost-optimized
+- 첨부:  plan.md frontmatter (gate_events / skip_* / readiness_flags)
+
+<span class="c">## ★ 반례 로그 (최소 1개)</span>
+- <span class="s">✅</span> 막아준:  없었으면 ___ / ___ 장치가 / ___ 시점에 잡음
+- <span class="s">❌</span> 놓친:    ___ 를 막았어야 / ___ 에서 뒤늦게 발견
+- <span class="s">➖</span> 헛수고:  ___ 가 멈췄지만 실제 위험 없었음
+- (실수 없던 세션) 막을 실수가 없었다 — [과했다/딱 맞았다]
+
+<span class="c">## 정렬 vs 마찰</span>
+- 실수를 잡은 순간:
+- 우회하고 싶었던 순간 + 이유:
+
+<span class="c">## 의도 일치</span>
+- 최종 결과 = 원래 의도? (Y/N), 어긋났다면 어디서:
+
+<span class="c">## 항목별 (해당만)</span>
+- ② grill / ⑤ 무게 / ⑥ 위험·순화 / ⑦ 신뢰성·drift / ⑧ runner:
+
+<span class="c">## 한 줄 총평</span>
+- 워크플로우 없이 했다면 더 좋았을까 / 나빴을까:</pre>
+  </section>
+
+  <footer>
+    함께 보기 → <a href="workflow-guide.html">← 워크플로우 핸드북</a>
+  </footer>
+
+</div>
+</main>
+</div>
+</body>
+</html>

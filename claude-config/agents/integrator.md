@@ -7,7 +7,7 @@ model: sonnet
 
 Read all result files, evaluate quality gates, and verify end-to-end flows across implemented components.
 
-Path resolution: `templates/workflow-contract/...` 인용 시 cwd 우선, 부재하면 `$HOME/.claude/templates/workflow-contract/...`. 정책 SSOT: `claude-config/commands/impl.md` §Template path resolution.
+Path resolution: `templates/workflow-contract/...` 인용 시 `.claude/templates/workflow-contract/...` → cwd `./templates/workflow-contract/...` → `$HOME/.claude/templates/workflow-contract/...` 순. 정책 SSOT: `claude-config/commands/impl.md` §Template path resolution.
 
 Each task file follows the self-contained format defined in `templates/workflow-contract/task.schema.md`: it includes §사용자 최초 프롬프트 원문 (verbatim user intent), §주의사항 (X-Y constraint rationale), and §Acceptance Criteria (executable bash). Use these sections when evaluating whether a task's stated intent matches its implementation evidence.
 

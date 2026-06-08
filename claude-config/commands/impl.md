@@ -7,10 +7,12 @@ Orchestrate implementation via specialist agents. Never write code directly. Pul
 ## Template path resolution
 
 본 prompt 와 sub-agent 는 `templates/workflow-contract/...` 의 SSOT 파일을 인용한다.
-**resolution 규칙 (cwd 우선, `~/.claude/templates` 폴백)**:
-`./templates/workflow-contract/{file}` 가 존재하면 그것, 없으면
-`~/.claude/templates/workflow-contract/{file}` 를 사용. 둘 다 없으면 사용자에게
-"`./deploy.sh` 미실행 가능성" 경고 후 진행 중단.
+**resolution 규칙 (in-project `.claude` 우선 → cwd → `~/.claude` 폴백)**:
+다음 순서로 처음 존재하는 파일을 사용한다 —
+1. `.claude/templates/workflow-contract/{file}` — 소비 프로젝트에 vendored 된 경우 (`sync-workflow.sh` 배포)
+2. `./templates/workflow-contract/{file}` — 워크플로우 레포 안에서 직접 실행
+3. `~/.claude/templates/workflow-contract/{file}` — user-level `deploy.sh` 배포
+셋 다 없으면 "`sync-workflow.sh` 또는 `./deploy.sh` 미실행 가능성" 경고 후 진행 중단.
 
 이 규칙은 in-session orchestrator / implementer / reviewer / integrator / 헤드리스 러너 모두 동일.
 
@@ -82,7 +84,7 @@ cost / latency 측정은 `runs/{TICKET}/manifest.yaml` 의 model / runner 필드
    → 수렴 시: {problem, approach} 반환 → mini-Intent Header로 기록
    → 미수렴 시: 호출자 자체 슬롯에 미수렴 사실 기록 (슬롯 이름은 호출자 결정)
    ```
-   grill.md 경로 해석: `./templates/workflow-contract/grill.md` 우선, 없으면 `~/.claude/templates/workflow-contract/grill.md`. 둘 다 없으면 "deploy.sh 미실행" 경고 후 중단.
+   grill.md 경로 해석: `.claude/templates/workflow-contract/grill.md` → `./templates/workflow-contract/grill.md` → `~/.claude/templates/workflow-contract/grill.md` 순. 셋 다 없으면 "sync-workflow.sh / deploy.sh 미실행" 경고 후 중단.
 
    산출물 — **mini-Intent Header** (problem / approach 2필드):
    ```

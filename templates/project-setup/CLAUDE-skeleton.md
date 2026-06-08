@@ -1,4 +1,4 @@
-<!-- cw-impl-workflow:start (managed by init-project.sh — do not rename these markers) -->
+<!-- cw-impl-workflow:start (managed by workflow sync — init-project.sh / sync-workflow.sh — do not rename these markers) -->
 ## Implementation Config
 specs_path: docs/specs
 prd_path: docs/prd
