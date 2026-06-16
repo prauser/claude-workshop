@@ -11,10 +11,16 @@ Bootstrap opt-in structured docs (`adr.yaml` + `conventions.yaml` + `glossary.md
    ("docs already initialized at ${PATH}; refusing to overwrite").
    If `${PATH}/glossary.md` exists, abort and tell user
    ("glossary already initialized at ${PATH}/glossary.md; refusing to overwrite").
-3. Copy templates verbatim:
-   - `templates/project-setup/docs/adr.yaml` → `${PATH}/adr.yaml`
-   - `templates/project-setup/docs/conventions.yaml` → `${PATH}/conventions.yaml`
-   - `templates/project-setup/docs/glossary.md` → `${PATH}/glossary.md`
+3. Copy templates verbatim. **Template source resolution** (처음 존재하는 디렉토리 사용):
+   1. `.claude/templates/project-setup/docs/` — 소비 프로젝트에 vendored 된 경우 (`sync-workflow.sh` 배포)
+   2. `./templates/project-setup/docs/` — 워크플로우 레포 안에서 직접 실행
+   3. `~/.claude/templates/project-setup/docs/` — user-level `deploy.sh` 배포
+   셋 다 없으면 "`sync-workflow.sh` 또는 `./deploy.sh` 미실행 가능성 — docs 템플릿을 찾을 수 없음" 경고 후 중단.
+
+   해석된 `${DOCS_TPL}` 기준으로 복사:
+   - `${DOCS_TPL}/adr.yaml` → `${PATH}/adr.yaml`
+   - `${DOCS_TPL}/conventions.yaml` → `${PATH}/conventions.yaml`
+   - `${DOCS_TPL}/glossary.md` → `${PATH}/glossary.md`
 4. Append to `CLAUDE.md` under `## Implementation Config` (creating the section if missing):
    ```
    docs_path: ${PATH}

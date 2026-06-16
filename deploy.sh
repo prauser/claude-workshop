@@ -128,5 +128,12 @@ if [ -d "$TEMPLATES_SOURCE_DIR/workflow-contract" ]; then
   done < <(find "$TEMPLATES_TARGET_DIR/workflow-contract" -type f -print0)
 fi
 
+# Deploy /init-docs templates → ~/.claude/templates/project-setup/docs/
+# (resolution tier 3 for the /init-docs command)
+if [ -d "$TEMPLATES_SOURCE_DIR/project-setup/docs" ]; then
+  mkdir -p "$TEMPLATES_TARGET_DIR/project-setup/docs"
+  cp -p "$TEMPLATES_SOURCE_DIR/project-setup/docs/"* "$TEMPLATES_TARGET_DIR/project-setup/docs/" 2>/dev/null || true
+fi
+
 echo ""
 echo "Done."
