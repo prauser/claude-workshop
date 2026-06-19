@@ -163,6 +163,11 @@ def build_event_stream(
         ts_str = msg.timestamp.isoformat()
 
         if msg.type == "user" and not msg.is_tool_response:
+            # isMeta=True → CLAUDE.md / 커맨드 정의 등 시스템 주입 컨텍스트.
+            # human NL이 아니므로 raw_user_turns와 user_turn 이벤트 카운트에서 제외한다.
+            if msg.is_meta:
+                continue
+
             # user_turn 이벤트: 메타만 — 텍스트 원문 절대 미포함
             text = ""
             if isinstance(msg.content, str):

@@ -16,25 +16,63 @@
 | 4 | **de-id** | 유저 raw 자연어 인풋(NL input) LLM 추상화(특성 보존·verbatim 제거) + secret 스캔 + 런타임 self-check hard-fail. LLM 추상화는 이 커맨드가 수행 | 구현: task-4 |
 | 5 | **bundle** | 번들 직렬화(버전드 스키마) + git 업로드. `--dry-run` 시 업로드 없이 감사(audit)만 | 구현: task-5 |
 
-## 사용법 (placeholder — task-5에서 확정)
+## 사용법
 
 ```
-/wf-collect
-/wf-collect --dry-run
+/wf-collect                            # dry-run 기본, 샘플 번들 출력
+/wf-collect --no-dry-run --target PATH  # 실제 git push (명시 옵션 필수)
 ```
 
 실행 예시(python3 직접 호출):
 
 ```bash
-# 전체 파이프라인 (bundle까지)
-python3 ~/.claude/templates/workflow-contract/runners/telemetry/collect.py discover
+# 전체 파이프라인 — dry-run (기본): 번들 파일 생성, push 없음
+python3 ~/.claude/templates/workflow-contract/runners/telemetry/collect.py \
+  run --roots ~/sbx-work --dry-run \
+  --generated-at "$(date -Iseconds)" \
+  --out ~/.claude/runs/PRA-109/bundle.sample.json
 
-# 드라이런(dry-run) — 업로드 없이 번들 내용 확인 (task-5 이후)
-python3 ~/.claude/templates/workflow-contract/runners/telemetry/collect.py --dry-run bundle
+# 특정 티켓만 dry-run
+python3 ~/.claude/templates/workflow-contract/runners/telemetry/collect.py \
+  run --roots ~/sbx-work --ticket PRA-109 --dry-run \
+  --generated-at "$(date -Iseconds)"
 
-# 특정 티켓만
-python3 ~/.claude/templates/workflow-contract/runners/telemetry/collect.py --ticket PRA-109 discover
+# 실제 업로드 (--no-dry-run + --target 모두 명시 필요)
+python3 ~/.claude/templates/workflow-contract/runners/telemetry/collect.py \
+  run --roots ~/sbx-work --no-dry-run \
+  --target /path/to/shared-telemetry-repo \
+  --generated-at "$(date -Iseconds)"
+
+# 또는 env로 타깃 설정
+WF_COLLECT_TARGET=/path/to/shared-telemetry-repo \
+python3 ~/.claude/templates/workflow-contract/runners/telemetry/collect.py \
+  run --roots ~/sbx-work --no-dry-run \
+  --generated-at "$(date -Iseconds)"
 ```
+
+### 번들 생성 타임스탬프 주입 (`--generated-at`)
+
+번들 결정성(determinism) 보장을 위해 타임스탬프는 **반드시 외부에서 주입**한다.
+수집기 코드 내부에서 `datetime.now()`를 호출하지 않는다.
+
+```bash
+--generated-at "$(date -Iseconds)"        # 셸 주입 권장
+--generated-at 2026-06-19T00:00:00+09:00  # 재현(replay) 테스트 용
+```
+
+### self-check hard-fail 시 동작
+
+1. `deid.selfcheck_bundle`이 번들 바이트에서 secret이나 forbidden_raw 원문을 탐지하면
+   `DeidLeakError`를 raise한다.
+2. `upload_bundle`은 이 에러를 잡지 않고 상위로 전파한다.
+3. 번들 파일(dry-run `--out`)은 쓰이지 않는다 — **전부-또는-전무**.
+4. collect.py는 오류 메시지를 stderr에 출력하고 exit code 1로 종료한다.
+
+```
+[ERROR] upload_bundle 실패 (self-check hard-fail 포함): forbidden_raw 누출: ...
+```
+
+이 경우 원인을 분석해 T4 LLM 추상화 품질을 확인한다.
 
 ## 비식별(De-identification) 스테이지 계약
 
@@ -75,6 +113,11 @@ python3 ~/.claude/templates/workflow-contract/runners/telemetry/collect.py --tic
 - 부분 인용(partial quote), 패러프레이즈(paraphrase)도 금지 — 특성으로 추상화
 - `path/code/diff/intent.*` 필드는 비식별 대상이 아님 — 평문 그대로
 
+**비식별 대상 (단 하나)**:
+- `user_prompt` (plan.md 유저 raw NL 인풋) + 세션 유저 턴 원문만 비식별 대상이다 (plan P0-2).
+- `intent.problem/approach/why`는 spec-plan이 생성한 AI 의역 내러티브이며 유저 raw NL이 아니다.
+  비식별 대상이 아니므로 평문으로 번들에 포함한다 (plan Open Questions '`intent.*` 평문 권장' 결정).
+
 ### 추상화 후 self-check 호출 (필수)
 
 이 커맨드는 추상화 완료 후 반드시 `deid.selfcheck_bundle`을 호출해야 한다.
@@ -102,6 +145,11 @@ bundle_bytes = json.dumps(bundle, **BUNDLE_DUMPS_KWARGS)
 ```
 
 self-check 실패 시 `DeidLeakError`가 raise되어 번들 업로드 전체가 차단된다(전부-또는-전무).
+
+> **CLI `collect.py run` 동작**: `collect.py run` CLI도 `assemble_forbidden_raw()`로 조립한
+> forbidden_raw를 **필터링**(단어 수 ≥ 4 토큰) 후 `upload_bundle`에 전달한다.
+> 즉, CLI 경로에서도 verbatim 누출 자동 차단이 CODE로 강제된다(문서 전용이 아님).
+> 전체 LLM 추상화 파이프라인은 `/wf-collect` 커맨드를 통해 실행한다.
 
 ### T5 직렬화 불변성 (serialization invariant)
 

@@ -16,12 +16,13 @@ LLM 추상화는 이 모듈의 책임이 아니다. 추상화는 커맨드(wf-co
 from __future__ import annotations
 
 import base64
+import copy
 import json
 import math
 import re
 import unicodedata
 from dataclasses import dataclass, field
-from typing import List, NamedTuple
+from typing import List, NamedTuple, Optional
 
 
 # ---------------------------------------------------------------------------
@@ -194,16 +195,60 @@ def _sliding_window_match(bundle_norm: str, raw_norm: str) -> bool:
     return False
 
 
+def _remove_nested_key(obj: object, key_path: str) -> object:
+    """key_path(점 구분 경로)로 지정된 키를 딕셔너리 트리에서 제거한 deep copy 반환.
+
+    예: key_path="plan.intent" → obj["tickets"][i]["plan"]["intent"]가 있는 경우
+    tickets 아래 각 ticket의 plan.intent 키를 제거한다.
+
+    이 함수는 보수적(conservative) 접근을 사용한다: 지정된 경로 키만 제거하고
+    나머지는 모두 NL-check 대상으로 유지해 예상 외 필드 누출을 잡아낸다.
+    """
+    parts = key_path.split(".", 1)
+    top = parts[0]
+    rest = parts[1] if len(parts) > 1 else None
+
+    if isinstance(obj, dict):
+        result = {}
+        for k, v in obj.items():
+            if k == top:
+                if rest is None:
+                    # 최종 키 — 제거(blank)
+                    pass
+                else:
+                    result[k] = _remove_nested_key(v, rest)
+            else:
+                result[k] = v
+        return result
+    elif isinstance(obj, list):
+        return [_remove_nested_key(item, key_path) for item in obj]
+    else:
+        return obj
+
+
 def selfcheck_bundle(
     bundle_obj: object,
     forbidden_raw: list[str],
+    *,
+    plaintext_subtrees: Optional[list[str]] = None,
 ) -> SelfCheckResult:
     """업로드 직전 hard-fail 프라이버시 게이트(privacy gate).
 
     검사 항목:
-      1. 직렬화된 번들 바이트에 forbidden_raw 원문이 substring 또는
-         정규화(NFKC + 공백·대소문자 폴딩 + 슬라이딩 윈도우) 부분일치로 존재하면 FAIL.
-      2. 직렬화된 번들 바이트에 scan_secrets 적중이 있으면 FAIL.
+      1. NL-check: forbidden_raw 원문이 번들에 존재하면 FAIL.
+         plaintext_subtrees가 지정된 경우, NL-check 직렬화에서 해당 키-경로를 제거한
+         deep copy를 사용한다(보수적 제외 — intent.* 등 평문 허용 서브트리만 제외,
+         나머지는 모두 검사). scan_secrets는 항상 전체 번들 바이트에 적용한다.
+      2. secret 스캔: 직렬화된 번들 전체 바이트에 scan_secrets 적중이 있으면 FAIL.
+
+    Args:
+        bundle_obj:         검사할 번들 dict.
+        forbidden_raw:      verbatim NL이 없어야 하는 원문 문자열 리스트.
+        plaintext_subtrees: NL-check에서 제외할 번들 키-경로 리스트(점 구분).
+                            예: ["tickets.plan.intent"] → intent.* 서브트리를 NL-check에서 제외.
+                            None(기본) = 번들 전체를 NL-check 대상으로 사용(하위 호환).
+                            scan_secrets는 plaintext_subtrees 지정 여부와 무관하게
+                            항상 전체 번들 바이트에 실행된다.
 
     Raises:
         DeidLeakError: 누출 탐지 시 hard-fail.
@@ -211,15 +256,26 @@ def selfcheck_bundle(
     Returns:
         SelfCheckResult: 통과 시 반환 (ok=True, secret_count=0, forbidden_hit_count=0).
     """
+    # 전체 번들 직렬화 — secret 스캔은 항상 전체 바이트 대상
     bundle_json = json.dumps(bundle_obj, **BUNDLE_DUMPS_KWARGS)
-    bundle_norm = _normalize(bundle_json)
+
+    # NL-check용 직렬화: plaintext_subtrees가 있으면 해당 서브트리를 제거한 deep copy 사용
+    if plaintext_subtrees:
+        nl_check_obj = copy.deepcopy(bundle_obj)
+        for key_path in plaintext_subtrees:
+            nl_check_obj = _remove_nested_key(nl_check_obj, key_path)
+        nl_check_json = json.dumps(nl_check_obj, **BUNDLE_DUMPS_KWARGS)
+    else:
+        nl_check_json = bundle_json
+
+    bundle_norm = _normalize(nl_check_json)
 
     forbidden_hits: list[str] = []
     for raw in forbidden_raw:
         if not raw:
             continue
         # 단순 substring (원문 그대로)
-        if raw in bundle_json:
+        if raw in nl_check_json:
             forbidden_hits.append(f"verbatim substring: {raw[:60]!r}")
             continue
         # 정규화 후 substring + 슬라이딩 윈도우
@@ -227,6 +283,7 @@ def selfcheck_bundle(
         if raw_norm and (raw_norm in bundle_norm or _sliding_window_match(bundle_norm, raw_norm)):
             forbidden_hits.append(f"normalized match: {raw[:60]!r}")
 
+    # secret 스캔은 항상 전체 번들 바이트에 적용 (plaintext_subtrees 무시)
     secrets = scan_secrets(bundle_json)
 
     if forbidden_hits or secrets:

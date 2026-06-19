@@ -673,5 +673,135 @@ class TestHarvestSessionsCli(unittest.TestCase):
             self.assertIn("parse_errors", result)
 
 
+# ---------------------------------------------------------------------------
+# 6. isMeta 필터 — p2-a 회귀 테스트 (Round 3)
+# ---------------------------------------------------------------------------
+
+class TestIsMetaFilter(unittest.TestCase):
+    """isMeta=True 유저 턴이 raw_user_turns에 포함되지 않음을 보장한다 (p2-a)."""
+
+    def test_is_meta_true_excluded_from_raw_user_turns(self):
+        """isMeta=True 유저 턴(CLAUDE.md 등 시스템 주입)은 raw_user_turns에 나타나면 안 된다."""
+        entries = [
+            {
+                # isMeta=True — CLAUDE.md + 커맨드 정의 주입 (human NL 아님)
+                "type": "user",
+                "message": {
+                    "role": "user",
+                    "content": "This is injected CLAUDE.md content with 3000+ words of system context",
+                },
+                "timestamp": "2026-06-19T10:00:00.000Z",
+                "isMeta": True,
+                "userType": "internal",
+            },
+            {
+                # 일반 human 유저 턴 — 포함돼야 한다
+                "type": "user",
+                "message": {
+                    "role": "user",
+                    "content": "/impl PRA-109 작업을 시작합니다",
+                },
+                "timestamp": "2026-06-19T10:00:01.000Z",
+                "isMeta": False,
+                "userType": "external",
+            },
+        ]
+        path = _make_jsonl(entries)
+        try:
+            events, raw = hs.build_event_stream(path)
+            # isMeta=True 턴의 내용이 raw_user_turns에 없어야 한다
+            for turn in raw:
+                self.assertNotIn(
+                    "injected CLAUDE.md content",
+                    turn,
+                    "isMeta=True 턴이 raw_user_turns에 포함됨 — P0 de-id 누출 가능성",
+                )
+            # 일반 human 턴은 포함돼야 한다
+            self.assertTrue(
+                any("PRA-109" in t for t in raw),
+                "일반 human 유저 턴이 raw_user_turns에 없음",
+            )
+        finally:
+            os.unlink(path)
+
+    def test_is_meta_true_excluded_from_user_turn_events(self):
+        """isMeta=True 유저 턴은 user_turn 이벤트로도 기록되면 안 된다."""
+        entries = [
+            {
+                "type": "user",
+                "message": {
+                    "role": "user",
+                    "content": "injected context isMeta",
+                },
+                "timestamp": "2026-06-19T10:00:00.000Z",
+                "isMeta": True,
+            },
+            {
+                "type": "user",
+                "message": {
+                    "role": "user",
+                    "content": "/impl PRA-109 normal turn",
+                },
+                "timestamp": "2026-06-19T10:00:01.000Z",
+                "isMeta": False,
+            },
+        ]
+        path = _make_jsonl(entries)
+        try:
+            events, raw = hs.build_event_stream(path)
+            user_turn_events = [e for e in events if e.get("type") == "user_turn"]
+            # 총 user_turn 이벤트 수: isMeta=False 턴만 (1개)
+            self.assertEqual(
+                len(user_turn_events), 1,
+                f"user_turn 이벤트가 {len(user_turn_events)}개 — isMeta=True 턴이 포함됐을 수 있음",
+            )
+        finally:
+            os.unlink(path)
+
+    def test_is_meta_false_included_normally(self):
+        """isMeta=False(또는 isMeta 필드 없음) 유저 턴은 정상적으로 포함된다."""
+        entries = [
+            {
+                "type": "user",
+                "message": {
+                    "role": "user",
+                    "content": "/impl PRA-109 정상 턴",
+                },
+                "timestamp": "2026-06-19T10:00:00.000Z",
+                # isMeta 필드 없음 — 기본값 False
+            },
+        ]
+        path = _make_jsonl(entries)
+        try:
+            events, raw = hs.build_event_stream(path)
+            self.assertEqual(len(raw), 1, "isMeta=False 턴이 raw_user_turns에 포함돼야 한다")
+            user_turn_events = [e for e in events if e.get("type") == "user_turn"]
+            self.assertEqual(len(user_turn_events), 1)
+        finally:
+            os.unlink(path)
+
+    def test_is_meta_parsed_in_session_lean(self):
+        """vendor/session_lean.py가 isMeta와 userType 필드를 MessageLean에 저장한다."""
+        from vendor.session_lean import parse_session_lean
+        entries = [
+            {
+                "type": "user",
+                "message": {"role": "user", "content": "test"},
+                "timestamp": "2026-06-19T10:00:00.000Z",
+                "isMeta": True,
+                "userType": "internal",
+            },
+        ]
+        path = _make_jsonl(entries)
+        try:
+            session = parse_session_lean(path)
+            self.assertEqual(len(session.messages), 1)
+            msg = session.messages[0]
+            self.assertTrue(msg.is_meta, "is_meta가 True여야 한다")
+            self.assertEqual(msg.user_type, "internal", "user_type이 'internal'이어야 한다")
+        finally:
+            os.unlink(path)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -65,6 +65,8 @@ class MessageLean:
     cwd: Optional[str] = None
     is_tool_response: bool = False
     tool_pairs: List[ToolCallPairLean] = field(default_factory=list)
+    is_meta: bool = False            # isMeta=True → 시스템 주입 컨텍스트 (CLAUDE.md 등) — human NL 아님
+    user_type: Optional[str] = None  # userType 필드 (예: "external", "internal")
 
 
 @dataclass
@@ -125,6 +127,10 @@ def _parse_message_entry(entry: Dict) -> Optional[MessageLean]:
     usage: Optional[TokenUsageLean] = None
     model: Optional[str] = None
 
+    # isMeta=True → CLAUDE.md / 커맨드 정의 등 시스템 주입 컨텍스트 (human NL 아님)
+    is_meta: bool = bool(entry.get("isMeta", False))
+    user_type: Optional[str] = entry.get("userType")
+
     if msg_type == "assistant":
         msg_inner = entry.get("message", {})
         model = msg_inner.get("model")
@@ -143,6 +149,8 @@ def _parse_message_entry(entry: Dict) -> Optional[MessageLean]:
         usage=usage,
         model=model,
         cwd=cwd,
+        is_meta=is_meta,
+        user_type=user_type,
     )
 
 
