@@ -42,6 +42,11 @@ try:
 except ImportError:  # pragma: no cover — harvest_artifacts.py 부재 시 graceful 처리
     _harvest_mod = None  # type: ignore
 
+try:
+    import harvest_sessions as _harvest_sessions_mod  # type: ignore
+except ImportError:  # pragma: no cover — harvest_sessions.py 부재 시 graceful 처리
+    _harvest_sessions_mod = None  # type: ignore
+
 
 # ---------------------------------------------------------------------------
 # 스테이지 구현 / 스텁(stub)
@@ -59,9 +64,51 @@ def harvest_artifacts(repos: list) -> list:
     return results
 
 
-def harvest_sessions(repos: list) -> list:  # TODO(task-3)
-    """세션로그 메타 harvest 스텁(stub). T3에서 구현."""
-    return []
+def harvest_sessions(repos: list) -> list:
+    """세션로그 메타 harvest — harvest_sessions.py 의 harvest_sessions_for_repo 호출."""
+    if _harvest_sessions_mod is None:  # pragma: no cover
+        return []
+    results = []
+    for corpus in repos:
+        rec = _harvest_sessions_mod.harvest_sessions_for_repo(corpus)
+        results.append(rec)
+    return results
+
+
+# ---------------------------------------------------------------------------
+# harvest-sessions 서브커맨드 핸들러
+# ---------------------------------------------------------------------------
+
+
+def cmd_harvest_sessions(args: argparse.Namespace) -> None:
+    """harvest-sessions 서브커맨드: 세션로그 메타 harvest 결과를 JSON으로 stdout 출력."""
+    if discover is None:  # pragma: no cover
+        print(json.dumps({"error": "discover 모듈을 찾을 수 없습니다."}), file=sys.stderr)
+        sys.exit(1)
+    if _harvest_sessions_mod is None:  # pragma: no cover
+        print(json.dumps({"error": "harvest_sessions 모듈을 찾을 수 없습니다."}), file=sys.stderr)
+        sys.exit(1)
+
+    roots = args.roots if args.roots else ["~/sbx-work"]
+    repos = discover.discover_repos(roots)
+
+    # --ticket 필터: discover 서브커맨드와 동일한 로직 적용
+    if args.ticket:
+        filtered = []
+        for repo in repos:
+            if repo.plans_dir:
+                ticket_plan_dir = os.path.join(repo.plans_dir, args.ticket)
+                if os.path.isdir(ticket_plan_dir):
+                    filtered.append(repo)
+        repos = filtered
+
+    results = harvest_sessions(repos)
+
+    output: Dict[str, Any] = {
+        "repo_count": len(repos),
+        "results": results,
+    }
+    print(json.dumps(output, ensure_ascii=False, indent=2, default=str))
 
 
 def deidentify(data: dict) -> dict:  # TODO(task-4)
@@ -236,6 +283,25 @@ def build_parser() -> argparse.ArgumentParser:
         help="특정 티켓만 처리 (서브커맨드 로컬 플래그).",
     )
 
+    # harvest-sessions 서브커맨드
+    harvest_sessions_sub = subparsers.add_parser(
+        "harvest-sessions",
+        help="세션로그 메타 harvest — 결과를 JSON으로 stdout 출력",
+    )
+    harvest_sessions_sub.add_argument(
+        "--roots",
+        nargs="+",
+        metavar="PATH",
+        default=None,
+        help="디스커버리(discovery) 루트(root) 목록 (기본: ~/sbx-work). 서브커맨드 로컬 플래그.",
+    )
+    harvest_sessions_sub.add_argument(
+        "--ticket",
+        metavar="TICKET",
+        default=None,
+        help="특정 티켓만 처리 (서브커맨드 로컬 플래그).",
+    )
+
     return parser
 
 
@@ -249,6 +315,10 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if args.command == "harvest-artifacts":
         cmd_harvest_artifacts(args)
+        return 0
+
+    if args.command == "harvest-sessions":
+        cmd_harvest_sessions(args)
         return 0
 
     parser.print_help()
