@@ -316,11 +316,16 @@ def correlate(
           by_ticket: {ticket: [{session_id, events, parse_errors}]},
           ticketless: [{session_id, parse_errors}],
           parse_errors: [전체 parse error 레코드],
+          raw_user_turns_by_session: {session_id: [raw_turn_str, ...]},
         }
+
+    raw_user_turns_by_session은 로컬 전용 — 번들에 직렬화하지 않는다.
+    T4 비식별 게이트의 forbidden_raw 조립에만 사용한다.
     """
     by_ticket: Dict[str, List[Dict]] = {}
     ticketless: List[Dict] = []
     all_parse_errors: List[Dict] = []
+    raw_user_turns_by_session: Dict[str, List[str]] = {}
 
     session_dir = getattr(corpus, "session_dir", None)
     if not session_dir or not os.path.isdir(session_dir):
@@ -328,13 +333,17 @@ def correlate(
             "by_ticket": by_ticket,
             "ticketless": ticketless,
             "parse_errors": all_parse_errors,
+            "raw_user_turns_by_session": raw_user_turns_by_session,
         }
 
     jsonl_paths = sorted(glob.glob(os.path.join(session_dir, "*.jsonl")))
 
     for jsonl_path in jsonl_paths:
         session_id = os.path.splitext(os.path.basename(jsonl_path))[0]
-        ticket, events, _raw, parse_errors = _correlate_session(jsonl_path, session_dir)
+        ticket, events, raw_turns, parse_errors = _correlate_session(jsonl_path, session_dir)
+
+        # raw_user_turns 저장 — 로컬 전용, 번들 직행 금지
+        raw_user_turns_by_session[session_id] = raw_turns
 
         if parse_errors:
             for pe in parse_errors:
@@ -358,11 +367,20 @@ def correlate(
         "by_ticket": by_ticket,
         "ticketless": ticketless,
         "parse_errors": all_parse_errors,
+        "raw_user_turns_by_session": raw_user_turns_by_session,
     }
 
 
 def harvest_sessions_for_repo(corpus: Any) -> Dict[str, Any]:
     """단일 RepoCorpus에서 세션 harvest 수행.
-    T2 harvest_artifacts와 동일한 반환 형태:
-    {by_ticket, ticketless, parse_errors}."""
+
+    반환 형태:
+    {
+      by_ticket, ticketless, parse_errors,
+      raw_user_turns_by_session: {session_id: [raw_turn_str, ...]},
+    }
+
+    raw_user_turns_by_session은 로컬 전용 — 번들에 직렬화하지 않는다.
+    collect.py가 forbidden_raw 조립에만 사용한다.
+    """
     return correlate(corpus)

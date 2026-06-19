@@ -36,6 +36,82 @@ python3 ~/.claude/templates/workflow-contract/runners/telemetry/collect.py --dry
 python3 ~/.claude/templates/workflow-contract/runners/telemetry/collect.py --ticket PRA-109 discover
 ```
 
+## 비식별(De-identification) 스테이지 계약
+
+> 이 섹션은 스테이지 4(de-id)의 LLM 추상화 계약을 정의한다. 결정론적(deterministic)
+> Python 검증(`deid.py`)과 LLM 추상화(이 커맨드)의 책임 경계를 명확히 한다.
+
+### 비식별 책임 분리
+
+| 책임 | 담당 |
+|------|------|
+| 유저 raw NL 추상화 (verbatim → 특성) | **이 커맨드(LLM)** |
+| secret 스캔 + 런타임 self-check hard-fail | **`deid.py` (결정론적 Python)** |
+
+### LLM 추상화 입력/출력 계약
+
+**입력** (이 커맨드가 받는 것):
+- `plan.user_prompt` — plan.md의 유저 raw 자연어 프롬프트 원문
+- `raw_user_turns` — 세션로그에서 추출한 유저 턴 원문 리스트
+
+**출력** (이 커맨드가 생성하는 것):
+- `user_input_characteristics` 객체 — 특성(feature)만 보존, verbatim(원문) 제거
+
+```json
+{
+  "user_input_characteristics": {
+    "length_band": "S|M|L",
+    "has_ticket_ref": true,
+    "request_shape": "feature|bugfix|question|refactor|config|other",
+    "specificity": "low|med|high",
+    "mentions_external_tool": false,
+    "language": "ko|en|mixed"
+  }
+}
+```
+
+**금지 사항**:
+- 원문 문장 복붙(verbatim copy) 금지 — 특성/카테고리만
+- 부분 인용(partial quote), 패러프레이즈(paraphrase)도 금지 — 특성으로 추상화
+- `path/code/diff/intent.*` 필드는 비식별 대상이 아님 — 평문 그대로
+
+### 추상화 후 self-check 호출 (필수)
+
+이 커맨드는 추상화 완료 후 반드시 `deid.selfcheck_bundle`을 호출해야 한다.
+**사람 승인 게이트 없이** 진행한다 — 자체검열(self-censorship)은 측정 무결성(목표 #2)을 훼손한다.
+프라이버시는 자동 self-check(hard-fail)가 담당한다.
+
+```python
+# 추상화 후 번들 조립 예시 (의사코드)
+bundle = {
+    "user_input_characteristics": abstracted_characteristics,
+    # ... 기타 평문 필드
+}
+
+# forbidden_raw 조립: plan user_prompt + 모든 session raw_user_turns
+# collect.assemble_forbidden_raw(artifact_results, session_results) 사용
+forbidden_raw = collect.assemble_forbidden_raw(artifact_results, session_results)
+
+# self-check — 실패 시 DeidLeakError raise (전체 업로드 차단)
+from deid import selfcheck_bundle, BUNDLE_DUMPS_KWARGS
+selfcheck_bundle(bundle, forbidden_raw)
+
+# T5 직렬화 시 반드시 BUNDLE_DUMPS_KWARGS를 사용해 동일한 바이트를 생성해야 한다
+import json
+bundle_bytes = json.dumps(bundle, **BUNDLE_DUMPS_KWARGS)
+```
+
+self-check 실패 시 `DeidLeakError`가 raise되어 번들 업로드 전체가 차단된다(전부-또는-전무).
+
+### T5 직렬화 불변성 (serialization invariant)
+
+> **T5 필수 사항**: T5(bundle 직렬화 + git 업로드) 는 번들을 `json.dumps(bundle, **BUNDLE_DUMPS_KWARGS)` 로
+> 직렬화해야 한다. `BUNDLE_DUMPS_KWARGS = dict(ensure_ascii=False, sort_keys=True)`.
+>
+> 이유: `selfcheck_bundle`이 이 kwargs로 직렬화한 바이트를 검사한다.
+> T5가 다른 kwargs를 쓰면 self-check된 바이트와 실제 업로드 바이트가 달라질 수 있다.
+> `deid.BUNDLE_DUMPS_KWARGS`를 import해 사용하면 두 직렬화가 항상 동일하다.
+
 ## 주의사항
 
 - 이 커맨드는 **명시 실행**만 한다. 자동/백그라운드/스케줄 트리거 없음.

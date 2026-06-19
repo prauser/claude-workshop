@@ -411,6 +411,34 @@ def _parse_scalar(text: str) -> Any:
 
 
 # ---------------------------------------------------------------------------
+# plan.md user_prompt 추출 (비식별 로컬 전용)
+# ---------------------------------------------------------------------------
+
+def get_plan_user_prompt(plan_path: str) -> Optional[str]:
+    """plan.md frontmatter에서 user_prompt 원문을 반환한다.
+
+    이 함수의 반환값은 로컬 전용이다 — 번들에 직렬화하지 않는다.
+    T4 비식별 게이트의 forbidden_raw 조립에만 사용한다.
+
+    Returns:
+        user_prompt 원문 문자열, 없거나 파싱 실패 시 None.
+    """
+    try:
+        text = _read_file(plan_path)
+    except OSError:
+        return None
+
+    fm, _ = parse_frontmatter(text)
+    if "_parse_error" in fm:
+        return None
+
+    val = fm.get("user_prompt")
+    if not val:
+        return None
+    return str(val)
+
+
+# ---------------------------------------------------------------------------
 # plan.md harvest
 # ---------------------------------------------------------------------------
 

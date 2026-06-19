@@ -47,6 +47,11 @@ try:
 except ImportError:  # pragma: no cover — harvest_sessions.py 부재 시 graceful 처리
     _harvest_sessions_mod = None  # type: ignore
 
+try:
+    import deid as _deid_mod  # type: ignore
+except ImportError:  # pragma: no cover — deid.py 부재 시 graceful 처리
+    _deid_mod = None  # type: ignore
+
 
 # ---------------------------------------------------------------------------
 # 스테이지 구현 / 스텁(stub)
@@ -65,7 +70,11 @@ def harvest_artifacts(repos: list) -> list:
 
 
 def harvest_sessions(repos: list) -> list:
-    """세션로그 메타 harvest — harvest_sessions.py 의 harvest_sessions_for_repo 호출."""
+    """세션로그 메타 harvest — harvest_sessions.py 의 harvest_sessions_for_repo 호출.
+
+    반환 레코드에는 raw_user_turns_by_session이 포함된다 (로컬 전용 — 번들 직행 금지).
+    collect 파이프라인이 forbidden_raw 조립에 사용한다.
+    """
     if _harvest_sessions_mod is None:  # pragma: no cover
         return []
     results = []
@@ -73,6 +82,56 @@ def harvest_sessions(repos: list) -> list:
         rec = _harvest_sessions_mod.harvest_sessions_for_repo(corpus)
         results.append(rec)
     return results
+
+
+def assemble_forbidden_raw(
+    artifact_results: List[Any],
+    session_results: List[Any],
+) -> List[str]:
+    """forbidden_raw를 조립한다 — plan user_prompt + 모든 session raw_user_turns.
+
+    이 함수의 반환값은 로컬 전용이다 — 번들에 직렬화하지 않는다.
+    deid.selfcheck_bundle 호출에만 사용한다.
+
+    Args:
+        artifact_results: harvest_artifacts 반환 리스트 (harvest_repo 레코드 목록).
+        session_results:  harvest_sessions 반환 리스트 (harvest_sessions_for_repo 레코드 목록).
+
+    Returns:
+        raw NL 원문 문자열 리스트 (plan user_prompt + raw_user_turns 전체).
+    """
+    forbidden: List[str] = []
+
+    if _harvest_mod is not None:
+        # 각 artifact result의 by_ticket 버킷에서 plan_path를 수집해 user_prompt 추출
+        for repo_rec in artifact_results:
+            if not isinstance(repo_rec, dict):
+                continue
+            by_ticket = repo_rec.get("by_ticket") or {}
+            for _ticket, bucket in by_ticket.items():
+                if not isinstance(bucket, dict):
+                    continue
+                plan_rec = bucket.get("plan")
+                if not isinstance(plan_rec, dict):
+                    continue
+                plan_path = plan_rec.get("plan_path")
+                if plan_path:
+                    prompt = _harvest_mod.get_plan_user_prompt(plan_path)
+                    if prompt:
+                        forbidden.append(prompt)
+
+    # 세션 raw_user_turns 수집
+    for repo_rec in session_results:
+        if not isinstance(repo_rec, dict):
+            continue
+        raw_by_session = repo_rec.get("raw_user_turns_by_session") or {}
+        for _session_id, turns in raw_by_session.items():
+            if isinstance(turns, list):
+                for turn in turns:
+                    if turn:
+                        forbidden.append(turn)
+
+    return forbidden
 
 
 # ---------------------------------------------------------------------------
@@ -111,9 +170,32 @@ def cmd_harvest_sessions(args: argparse.Namespace) -> None:
     print(json.dumps(output, ensure_ascii=False, indent=2, default=str))
 
 
-def deidentify(data: dict) -> dict:  # TODO(task-4)
-    """비식별(de-identification) 스텁(stub). T4에서 구현."""
-    return data
+def deidentify(bundle_obj: dict, forbidden_raw: Optional[List[str]] = None) -> dict:
+    """비식별(de-identification) 게이트 — secret 스캔 + 런타임 self-check.
+
+    deid.selfcheck_bundle을 호출해 번들 객체에 forbidden_raw 원문이나 secret이 없는지
+    검증한다. self-check 실패 시 deid.DeidLeakError가 raise되며(hard-fail) 이 함수
+    밖으로 전파된다. 통과 객체만 호출자(caller)에게 반환된다.
+
+    Args:
+        bundle_obj:    self-check할 번들 딕셔너리.
+        forbidden_raw: 추상화 입력이었던 raw NL 리스트(plan user_prompt + raw_user_turns).
+                       None이면 빈 리스트로 처리한다.
+
+    Returns:
+        self-check를 통과한 bundle_obj 그대로.
+
+    Raises:
+        deid.DeidLeakError: 누출 탐지 시 hard-fail.
+        RuntimeError:       deid 모듈을 임포트할 수 없을 때.
+    """
+    if _deid_mod is None:  # pragma: no cover
+        raise RuntimeError("deid 모듈을 찾을 수 없습니다. deid.py가 같은 디렉토리에 있는지 확인하세요.")
+    raw_list: List[str] = forbidden_raw if forbidden_raw is not None else []
+    # scan_secrets는 selfcheck_bundle 내부에서 번들 직렬화 바이트에 대해 호출된다.
+    _deid_mod.selfcheck_bundle(bundle_obj, raw_list)
+    # 통과 시 원본 객체 반환 — 복사하지 않는다(upstream이 동일 참조 유지 필요 가능성).
+    return bundle_obj
 
 
 def serialize_bundle(data: dict, out: Optional[str] = None) -> dict:  # TODO(task-5)
