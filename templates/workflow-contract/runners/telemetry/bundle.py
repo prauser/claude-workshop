@@ -180,6 +180,9 @@ def serialize_bundle(
                     "risk_acks": stripped_plan_risk_acks,
                     "intent_history_len": plan_rec.get("intent_history_len", 0),
                     "plan_sha": short_sha,
+                    # legacy schema-drift indicator (P1-1, plan A4)
+                    # None when absent (modern plan), numeric/truthy when present (drift signal)
+                    "skip_grill_count": plan_rec.get("skip_grill_count"),
                 }
 
             # tasks 필드 구성

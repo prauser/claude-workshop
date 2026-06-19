@@ -472,8 +472,10 @@ def _harvest_plan_from_path(plan_path: str) -> Dict[str, Any]:
             ]
         }
 
-    # legacy skip_grill_count 정규화 (P1-1)
+    # legacy skip_grill_count 정규화 (P1-1) + 보존
     skip_presearch, skip_gate2 = _normalize_skip_counts(fm)
+    # legacy 필드 원본값 보존 — schema-drift 신호로 bundle에 전달 (P1-1, plan A4)
+    skip_grill_count_legacy = fm.get("skip_grill_count")
 
     # intent 필드 추출 — user_prompt는 수집하지 않는다 (비식별 경계)
     intent_raw = fm.get("intent") or {}
@@ -517,6 +519,8 @@ def _harvest_plan_from_path(plan_path: str) -> Dict[str, Any]:
         "risk_acks": risk_acks,
         "intent_history_len": intent_history_len,
         "plan_sha": plan_sha,
+        # legacy indicator — None when absent, numeric value when present (schema-drift signal)
+        "skip_grill_count": skip_grill_count_legacy,
     }
 
 

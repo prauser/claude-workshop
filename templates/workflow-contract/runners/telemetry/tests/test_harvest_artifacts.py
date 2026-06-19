@@ -277,7 +277,8 @@ class TestLegacySkipNormalization(unittest.TestCase):
             self.assertIsNotNone(rec)
             self.assertEqual(rec.get("skip_presearch"), 3)
             self.assertEqual(rec.get("skip_gate2"), 0)
-            self.assertNotIn("skip_grill_count", rec)
+            # skip_grill_count는 schema-drift 신호로 보존된다 (p2-B fix)
+            self.assertEqual(rec.get("skip_grill_count"), 3)
 
 
 class TestTicketlessSeparation(unittest.TestCase):

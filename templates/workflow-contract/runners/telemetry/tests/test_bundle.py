@@ -924,3 +924,104 @@ class TestRound3Regression:
                 plaintext_subtrees=None,
             )
         assert not os.path.exists(out_path), "DeidLeakError 후 파일이 생성돼서는 안 된다"
+
+
+# ---------------------------------------------------------------------------
+# TestLegacySkipGrillCount — p2-B: schema-drift 신호 end-to-end
+# ---------------------------------------------------------------------------
+
+class TestLegacySkipGrillCount:
+    """plan.skip_grill_count legacy indicator가 번들에 올바르게 반영되는지 검증.
+
+    P1-1: legacy skip_grill_count는 schema-drift 신호다.
+    bundle.py는 이 값을 plan.skip_grill_count로 emit해야 한다.
+    """
+
+    def _make_harvested_with_legacy_skip_grill(
+        self,
+        ticket: str = "PRA-LEGACY",
+        skip_grill_count: int = 3,
+    ) -> dict:
+        """skip_grill_count를 포함한 plan_rec을 담은 harvested 구조."""
+        return {
+            "artifact_results": [
+                {
+                    "repo_path": "/tmp/legacy-repo",
+                    "repo_name": "legacy-repo",
+                    "by_ticket": {
+                        ticket: {
+                            "plan": {
+                                "ticket": ticket,
+                                "plan_path": f"/tmp/legacy-repo/.claude/plans/{ticket}/plan.md",
+                                "intent": {
+                                    "problem": "레거시 플랜 테스트",
+                                    "approach": None,
+                                    "why": None,
+                                    "prd_ref": None,
+                                },
+                                "gate_events": [],
+                                "skip_presearch": 0,
+                                "skip_gate2": 0,
+                                "readiness_flags": [],
+                                "risk_acks": [],
+                                "intent_history_len": 0,
+                                "plan_sha": "def456",
+                                # legacy indicator — harvest_artifacts가 보존해 전달
+                                "skip_grill_count": skip_grill_count,
+                            },
+                            "tasks": [],
+                            "manifest": None,
+                        }
+                    },
+                    "ticketless": [],
+                    "parse_errors": [],
+                }
+            ],
+            "session_results": [],
+        }
+
+    def test_skip_grill_count_emitted_when_present(self):
+        """plan에 skip_grill_count가 있으면 번들 plan.skip_grill_count에 값이 나타나야 한다."""
+        harvested = self._make_harvested_with_legacy_skip_grill(
+            ticket="PRA-LEGACY", skip_grill_count=3
+        )
+        b = serialize_bundle(harvested, {}, generated_at=_GENERATED_AT)
+
+        entry = next(t for t in b["tickets"] if t["ticket"] == "PRA-LEGACY")
+        plan = entry.get("plan")
+        assert plan is not None, "plan 필드가 없다"
+        assert "skip_grill_count" in plan, "plan에 skip_grill_count 필드가 없다"
+        assert plan["skip_grill_count"] == 3, (
+            f"skip_grill_count 값 불일치: 기대=3, 실제={plan['skip_grill_count']!r}"
+        )
+
+    def test_skip_grill_count_none_when_absent(self):
+        """plan에 skip_grill_count가 없으면 번들 plan.skip_grill_count는 None이어야 한다."""
+        # skip_grill_count 없는 일반 harvested (_make_harvested_with_ticket은 skip_grill_count 없음)
+        b = serialize_bundle(
+            _make_harvested_with_ticket("PRA-TEST"),
+            _make_clean_characteristics("PRA-TEST"),
+            generated_at=_GENERATED_AT,
+        )
+        entry = next(t for t in b["tickets"] if t["ticket"] == "PRA-TEST")
+        plan = entry.get("plan")
+        assert plan is not None
+        # skip_grill_count 키가 없거나 None이어야 한다
+        assert plan.get("skip_grill_count") is None, (
+            f"skip_grill_count가 None이 아님: {plan.get('skip_grill_count')!r}"
+        )
+
+    def test_skip_grill_count_zero_is_preserved(self):
+        """skip_grill_count=0인 경우도 보존되어야 한다 (absent와 구별)."""
+        harvested = self._make_harvested_with_legacy_skip_grill(
+            ticket="PRA-ZERO", skip_grill_count=0
+        )
+        b = serialize_bundle(harvested, {}, generated_at=_GENERATED_AT)
+
+        entry = next(t for t in b["tickets"] if t["ticket"] == "PRA-ZERO")
+        plan = entry.get("plan")
+        assert plan is not None
+        assert "skip_grill_count" in plan, "plan에 skip_grill_count 필드가 없다"
+        assert plan["skip_grill_count"] == 0, (
+            f"skip_grill_count=0이 보존되지 않음: {plan['skip_grill_count']!r}"
+        )
