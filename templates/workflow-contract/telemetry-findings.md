@@ -73,20 +73,22 @@ evidence_ref: <로컬 세션 포인터>
 
 | Finding ID | 설명 | 입력 필드 | 계산 위치 |
 |---|---|---|---|
-| `rubber-stamp` | 게이트 승인 시 유저 검토 없이 0~1턴만에 통과 | `plan.gate_events[].turns` | **agentlens** |
+| `rubber-stamp` | 게이트 0~1턴 통과. **단독은 약한 신호**(빠른 승인 ≠ 미검토) → `confidence=low`; bypass/skip 동반 시에만 `medium` | `plan.gate_events[].turns` (+ bypass/skip 동반 여부) | **agentlens** |
 | `bypass` | `readiness_flags`에 resolution 없는 채로 진행 | `plan.readiness_flags[].resolution` (빈 문자열 또는 누락) | **agentlens** |
 | `skip` | `skip_presearch` 또는 `skip_gate2`가 1(비-0) | `plan.skip_presearch`, `plan.skip_gate2` | **agentlens** |
 | `drift` | `intent_history_len > 0` (문제 정의 재정의 발생) | `plan.intent_history_len` | **agentlens** |
-| `ceremonial` | 게이트 이벤트가 형식적 통과 패턴임을 의미하는 원시 신호 | raw 세션 콘텐츠 의존 | **collector 신호 제공** |
-| `gate2-comprehension` | Gate 2 이해 미달 (이해도 검증 실패 패턴) | raw 세션 콘텐츠 의존 | **collector 신호 제공** |
+| `ceremonial` | 게이트 이벤트가 형식적 통과 패턴임을 의미하는 간접 신호 | `plan.gate_events[].self_pass` 전부 true | **agentlens** (간접, `confidence=low`) |
+| `gate2-comprehension-miss` | Gate 2 이해도 게이트에서 *놓친* 신호 (이해미달에도 진행). **high-confidence, 강하게 노출** | `plan.gate_events[].{probe,result}` (`result==proceed-flagged`), `plan.readiness_flags[].flag` (`gate2-comprehension-incomplete`/`gate2-grill-incomplete`) | **agentlens** |
 
-**`ceremonial`·`gate2-comprehension` 처리**: 이 두 finding은 raw 세션 텍스트에 의존하므로, `collector`가 번들에 집계 신호(예: `plan.gate_events[].self_pass`, `plan.gate_events[].turns`)를 포함하고, `agentlens`는 이 신호를 조합해 간접 추정한다. raw 콘텐츠 자체는 번들에 포함되지 않는다.
+**`gate2-comprehension-miss` 처리 (갱신)**: Gate 2 이해도 *miss*의 구조 신호(probe `result==proceed-flagged`, 터미널 readiness flag)는 번들에 **평문으로 실리므로** `agentlens`가 직접 `confidence=high`로 계산한다 — 측정 목표 #2의 핵심이라 **강하게 노출**(저표본 greying 면제, 아래 §저표본 규약 참조). 세션 전체의 *깊은* 이해도 추정은 여전히 raw 의존이며 후속 과제(collector 신호 enrich).
+
+**`rubber-stamp` 신뢰도 (갱신)**: 턴 수만으로는 "진짜 검토 후 승인"과 "맹목 승인"을 구분하지 못한다(둘 다 turns≤1). 따라서 단독 rubber-stamp는 `confidence=low`(참고용)로 두고, 같은 티켓에 `bypass`/`skip` 같은 실제 우회 신호가 동반될 때만 `medium`으로 올린다. 개별 건이 아니라 **추세(비율)**로 해석한다.
 
 #### Finding 필드 (`rubber-stamp` 예시)
 
 ```
 kind:       "user-behavior"
-pattern:    "rubber-stamp" | "bypass" | "skip" | "drift" | "ceremonial" | "gate2-comprehension"
+pattern:    "rubber-stamp" | "bypass" | "skip" | "drift" | "ceremonial" | "gate2-comprehension-miss"
 source:     "bundle"
 ticket:     <티켓 ID>
 gate:       <0|1|2|3>     # gate_events 기반
@@ -98,10 +100,11 @@ evidence_ref: <로컬 아티팩트 포인터>
 
 #### 임계 후보 (Phase B 데이터 축적 후 확정 예정)
 
-- `rubber-stamp`: `plan.gate_events[].turns <= 1` — 임계값 tunable
+- `rubber-stamp`: `plan.gate_events[].turns <= 1` (임계 tunable). **confidence = low(단독) / medium(bypass·skip 동반)**.
 - `skip`: `plan.skip_presearch == 1` OR `plan.skip_gate2 == 1`
 - `drift`: `plan.intent_history_len >= 1`
 - `bypass`: `len([f for f in plan.readiness_flags if not f.get("resolution")]) > 0`
+- `gate2-comprehension-miss`: `gate_events[].result == "proceed-flagged"` OR `readiness_flags[].flag in {gate2-comprehension-incomplete, gate2-grill-incomplete}`. **confidence = high** (저표본 면제).
 
 ---
 
@@ -144,7 +147,9 @@ evidence_ref:  <로컬 아티팩트 포인터>
 |---|---|---|---|---|
 | `sessions[].events` (평문 이벤트 스트림) | #1 에이전트 비효율 | `repeated-read`, `edit-retry`, `search-then-discard` | agentlens (`detect_tool_inefficiency` 어댑트) | read ≥ 3회 / edit 실패 연속 ≥ 2회 |
 | `plan.gate_events[].turns` | #2 사용자 행동 | `rubber-stamp` | agentlens | turns ≤ 1 (tunable) |
-| `plan.gate_events[].self_pass` | #2 사용자 행동 | `ceremonial` (간접 신호) | collector 신호 → agentlens 추정 | self_pass=true 비율 (tunable) |
+| `plan.gate_events[].self_pass` | #2 사용자 행동 | `ceremonial` (간접 신호) | agentlens (간접, confidence=low) | self_pass=true 비율 (tunable) |
+| `plan.gate_events[].{probe,result}` | #2 사용자 행동 | `gate2-comprehension-miss` | agentlens (high, 저표본 면제) | `result == "proceed-flagged"` |
+| `plan.readiness_flags[].flag` | #2 사용자 행동 | `gate2-comprehension-miss` | agentlens (high, 저표본 면제) | `gate2-comprehension-incomplete` / `gate2-grill-incomplete` |
 | `plan.readiness_flags[].resolution` | #2 사용자 행동, #3 입력 품질 | `bypass`, `readiness-anomaly` | agentlens | resolution 부재 또는 빈값 |
 | `plan.skip_presearch` | #2 사용자 행동 | `skip` | agentlens | 값 = 1 |
 | `plan.skip_gate2` | #2 사용자 행동 | `skip` | agentlens | 값 = 1 |
@@ -170,6 +175,7 @@ evidence_ref:  <로컬 아티팩트 포인터>
 2. **`n < 임계값` → 회색 표시**: 기본 임계값 `n_min = 3` (tunable). 임계 미만 finding은 "데이터 부족(low-confidence)" 상태로 표시하되 삭제하지 않는다.
 3. **silent truncation 금지**: 표본 부족을 이유로 finding을 출력에서 제외하거나 0으로 대체하지 않는다. 부족 상태를 명시적으로 노출한다.
 4. **임계값 tunable**: `n_min`은 하드코딩하지 않는다. Phase B 데이터 축적 후 조정 예정 (§Open Questions 참조).
+5. **high-confidence 인스턴스 알림은 greying 면제**: 저표본 규약은 *추세/비율형* 신호(예: `rubber-stamp`·`ceremonial` 등 medium/low)의 신뢰도 표시용이다. `confidence=high`인 **#2 사용자 행동의 결정적 인스턴스 알림**(`bypass`·`skip`·`drift`·`gate2-comprehension-miss`)은 드물수록 오히려 중요하므로 `n < n_min`이어도 `low_sample` 회색 처리하지 않는다(`n` 표기는 유지). #1·#3의 저표본 동작은 그대로 둔다.
 
 ### 표시 예시 (추상화)
 
