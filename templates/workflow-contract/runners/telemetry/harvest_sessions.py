@@ -357,6 +357,9 @@ def correlate(
 
         record = {
             "session_id": session_id,
+            # 평문 이벤트 스트림(plan P0-3 번들 핵심 페이로드, #1 detector 입력).
+            # 유저 턴 텍스트는 build_event_stream 에서 이미 제외됨 — events 는 비식별 안전.
+            "events": events,
             "event_count": len(events),
             "parse_errors": parse_errors,
         }

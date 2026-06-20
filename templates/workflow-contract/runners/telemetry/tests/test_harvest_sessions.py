@@ -564,6 +564,51 @@ class TestCorrelate(unittest.TestCase):
         self.assertIn("ticketless", result)
         self.assertIn("parse_errors", result)
 
+    def test_correlate_record_includes_events_list(self):
+        """correlate record 는 event_count 뿐 아니라 events 리스트도 담아야 한다.
+
+        회귀: cross-repo 이벤트 누락 — correlate 가 event_count 만 남기고 events 를
+        버려서 운영 번들 sessions[].events 가 빈 채로 #1 detector 입력이 0이 되던 버그.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "sess1.jsonl")
+            with open(path, "w") as f:
+                for entry in _simple_session("PRA-109"):
+                    f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+            corpus = _FakeCorpus(tmpdir)
+            result = hs.correlate(corpus)
+            rec = result["by_ticket"]["PRA-109"][0]
+            self.assertIn("events", rec)
+            self.assertGreater(len(rec["events"]), 0)
+            self.assertEqual(len(rec["events"]), rec["event_count"])
+            # de-id: 유저 턴 raw 텍스트가 events 바이트에 없어야 한다.
+            blob = json.dumps(rec["events"], ensure_ascii=False)
+            self.assertNotIn("테스트 작업 수행", blob)
+
+    def test_events_flow_correlate_to_bundle(self):
+        """end-to-end: correlate → serialize_bundle 결과 sessions[].events 가 채워진다.
+
+        이 경로가 이번 버그의 사각지대였다 — 번들 직렬화 테스트는 events 를 수동으로
+        넣은 fixture 로만 통과했고, 실제 correlate 산출을 번들로 흘려보는 단언이 없었다.
+        """
+        import bundle as bundle_mod
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "sess1.jsonl")
+            with open(path, "w") as f:
+                for entry in _simple_session("PRA-109"):
+                    f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+            corpus = _FakeCorpus(tmpdir)
+            corr = hs.correlate(corpus)
+            harvested = {"artifact_results": [], "session_results": [corr]}
+            b = bundle_mod.serialize_bundle(
+                harvested, {}, generated_at="2026-06-19T00:00:00+09:00"
+            )
+            pra = [t for t in b["tickets"] if t["ticket"] == "PRA-109"]
+            self.assertEqual(len(pra), 1)
+            sessions = pra[0]["sessions"]
+            self.assertTrue(any(len(s.get("events") or []) > 0 for s in sessions),
+                            "번들 sessions[].events 가 비어 있으면 안 된다")
+
 
 # ---------------------------------------------------------------------------
 # 4. agentlens parity 테스트 (agentlens 설치돼 있을 때만)
