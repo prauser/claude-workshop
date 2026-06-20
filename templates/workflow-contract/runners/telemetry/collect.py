@@ -655,12 +655,14 @@ def cmd_run(args: argparse.Namespace) -> int:
     target: Optional[str] = getattr(args, "target", None) or os.environ.get("WF_COLLECT_TARGET")
 
     # 번들 스키마에서 평문 허용 서브트리 (NL-check 제외 대상):
-    #   tickets[].plan.intent — spec-plan 생성 AI 의역 내러티브 (plan P0-2 평문 허용)
-    # 보수적 제외: intent.* 서브트리만 NL-check 면제, 나머지 필드는 모두 검사.
+    #   tickets[].plan.intent          — spec-plan 생성 AI 의역 내러티브 (plan P0-2 평문 허용)
+    #   tickets[].plan.intent_history  — intent 변경 이력(prev_value/reason). intent.* 와
+    #                                    동일 클래스의 spec-plan 생성 평문 — raw 유저 NL 아님.
+    # 보수적 제외: 위 두 서브트리만 NL-check 면제, 나머지 필드는 모두 검사.
     # Note: tasks[].risk_acks.detail은 bundle.serialize_bundle에서 이미 제거된다
     #       (감사 산문은 번들 메트릭 범위 밖 — bundle.py 참조).
     # scan_secrets는 항상 전체 번들 바이트에 실행된다.
-    _INTENT_SUBTREES = ["tickets.plan.intent"]
+    _INTENT_SUBTREES = ["tickets.plan.intent", "tickets.plan.intent_history"]
 
     try:
         result = upload_bundle_stage(

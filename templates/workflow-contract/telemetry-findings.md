@@ -76,7 +76,7 @@ evidence_ref: <로컬 세션 포인터>
 | `rubber-stamp` | 게이트 0~1턴 통과. **단독은 약한 신호**(빠른 승인 ≠ 미검토) → `confidence=low`; bypass/skip 동반 시에만 `medium` | `plan.gate_events[].turns` (+ bypass/skip 동반 여부) | **agentlens** |
 | `bypass` | `readiness_flags`에 resolution 없는 채로 진행 | `plan.readiness_flags[].resolution` (빈 문자열 또는 누락) | **agentlens** |
 | `skip` | `skip_presearch` 또는 `skip_gate2`가 1(비-0) | `plan.skip_presearch`, `plan.skip_gate2` | **agentlens** |
-| `drift` | `intent_history_len > 0` (문제 정의 재정의 발생) | `plan.intent_history_len` | **agentlens** |
+| `drift` | intent 재정의 발생. 번들의 `intent_history` 상세(field/prev_value/reason)로 **무엇이 왜 바뀌었는지** 표시 (없으면 count 폴백) | `plan.intent_history_len`, `plan.intent_history[]` | **agentlens** |
 | `ceremonial` | 게이트 이벤트가 형식적 통과 패턴임을 의미하는 간접 신호 | `plan.gate_events[].self_pass` 전부 true | **agentlens** (간접, `confidence=low`) |
 | `gate2-comprehension-miss` | Gate 2 이해도 게이트에서 *놓친* 신호 (이해미달에도 진행). **high-confidence, 강하게 노출** | `plan.gate_events[].{probe,result}` (`result==proceed-flagged`), `plan.readiness_flags[].flag` (`gate2-comprehension-incomplete`/`gate2-grill-incomplete`) | **agentlens** |
 
@@ -154,6 +154,7 @@ evidence_ref:  <로컬 아티팩트 포인터>
 | `plan.skip_presearch` | #2 사용자 행동 | `skip` | agentlens | 값 = 1 |
 | `plan.skip_gate2` | #2 사용자 행동 | `skip` | agentlens | 값 = 1 |
 | `plan.intent_history_len` | #2 사용자 행동, #3 입력 품질 | `drift`, `schema-drift` | agentlens | ≥ 1 (tunable) |
+| `plan.intent_history[]` (`field`/`prev_value`/`reason`) | #2 사용자 행동 | `drift` 상세 | agentlens | drift finding detail/metrics. spec-plan 생성 평문 → de-id NL-check 제외(intent.* 와 동일) |
 | `plan.plan_sha` | #3 입력 품질 | `schema-drift` (추세 스토어 비교) | agentlens (추세 스토어) | 변경 횟수 ≥ 2 (tunable) |
 | `plan.risk_acks[].ack` | #3 입력 품질 | `config-gap` | agentlens | `needs_check` 잔존 |
 | `manifest.status` | #3 입력 품질 | `config-gap` | agentlens | `partial` 또는 누락 |

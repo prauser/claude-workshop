@@ -502,6 +502,20 @@ def _harvest_plan_from_path(plan_path: str) -> Dict[str, Any]:
 
     intent_history = fm.get("intent_history") or []
     intent_history_len = len(intent_history) if isinstance(intent_history, list) else 0
+    # intent_history 상세 — field/prev_value/reason 은 spec-plan 이 생성한 평문(AI
+    # 의역)이지 raw 유저 NL 이 아니다(intent.* 와 동일 클래스). drift finding 이
+    # "무엇이 왜 바뀌었는지"를 보이도록 번들에 싣는다. de-id self-check 에서는
+    # intent.* 처럼 plaintext_subtrees 로 제외한다(collect.py _INTENT_SUBTREES).
+    intent_history_detail = []
+    if isinstance(intent_history, list):
+        for h in intent_history:
+            if isinstance(h, dict):
+                intent_history_detail.append({
+                    "ts": h.get("ts"),
+                    "field": h.get("field"),
+                    "prev_value": h.get("prev_value"),
+                    "reason": h.get("reason"),
+                })
 
     ticket = fm.get("ticket")
 
@@ -518,6 +532,7 @@ def _harvest_plan_from_path(plan_path: str) -> Dict[str, Any]:
         "readiness_flags": readiness_flags,
         "risk_acks": risk_acks,
         "intent_history_len": intent_history_len,
+        "intent_history": intent_history_detail,
         "plan_sha": plan_sha,
         # legacy indicator — None when absent, numeric value when present (schema-drift signal)
         "skip_grill_count": skip_grill_count_legacy,

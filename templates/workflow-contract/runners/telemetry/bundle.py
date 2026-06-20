@@ -179,6 +179,10 @@ def serialize_bundle(
                     "readiness_flags": plan_rec.get("readiness_flags") or [],
                     "risk_acks": stripped_plan_risk_acks,
                     "intent_history_len": plan_rec.get("intent_history_len", 0),
+                    # intent 변경 이력 상세(field/prev_value/reason) — spec-plan 생성 평문.
+                    # drift finding 이 무엇이 왜 바뀌었는지 보이도록 싣는다. self-check 에서
+                    # intent.* 와 함께 plaintext_subtrees 로 제외(collect.py _INTENT_SUBTREES).
+                    "intent_history": plan_rec.get("intent_history") or [],
                     "plan_sha": short_sha,
                     # legacy schema-drift indicator (P1-1, plan A4)
                     # None when absent (modern plan), numeric/truthy when present (drift signal)

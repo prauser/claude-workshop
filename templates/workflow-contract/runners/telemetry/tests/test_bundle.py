@@ -925,6 +925,52 @@ class TestRound3Regression:
             )
         assert not os.path.exists(out_path), "DeidLeakError 후 파일이 생성돼서는 안 된다"
 
+    def test_intent_history_excluded_from_nl_check(self, tmp_path):
+        """intent_history(prev_value/reason)는 spec-plan 생성 평문이므로 intent.* 처럼
+        plaintext_subtrees 로 NL-check 에서 제외된다. 제외 시 통과, 미제외 시 DeidLeakError.
+        """
+        prior = "위의 내용 진행해주되 먼저 linear로 티켓 만들고 그거 이용해서 하자"
+        assert len(prior.split()) >= FORBIDDEN_MIN_TOKENS
+
+        def _bundle_with_history():
+            b = serialize_bundle(_make_minimal_harvested(), {}, generated_at=_GENERATED_AT)
+            b["tickets"] = [{
+                "ticket": "PRA-TEST",
+                "repo": "test",
+                "plan": {
+                    "intent": {"problem": "p", "approach": "a", "why": None},
+                    "intent_history": [
+                        {"ts": "t1", "field": "problem", "prev_value": prior, "reason": "재정렬"}
+                    ],
+                    "gate_events": [], "skip_presearch": 0, "skip_gate2": 0,
+                    "readiness_flags": [], "risk_acks": [], "intent_history_len": 1,
+                    "plan_sha": "abc123def456",
+                },
+                "tasks": [], "manifest": None, "sessions": [],
+                "user_input_characteristics": {},
+                "evidence_ref": {"session_paths": [], "artifact_paths": []},
+            }]
+            return b
+
+        # 제외 시 통과
+        ok_path = str(tmp_path / "hist_excluded.json")
+        result = upload_bundle(
+            _bundle_with_history(), None, dry_run=True, out=ok_path,
+            forbidden_raw=[prior],
+            plaintext_subtrees=["tickets.plan.intent", "tickets.plan.intent_history"],
+        )
+        assert result.ok and os.path.exists(ok_path)
+
+        # 미제외(intent만) → intent_history 의 prev_value 가 검사돼 DeidLeakError
+        bad_path = str(tmp_path / "hist_not_excluded.json")
+        with pytest.raises(DeidLeakError):
+            upload_bundle(
+                _bundle_with_history(), None, dry_run=True, out=bad_path,
+                forbidden_raw=[prior],
+                plaintext_subtrees=["tickets.plan.intent"],
+            )
+        assert not os.path.exists(bad_path)
+
 
 # ---------------------------------------------------------------------------
 # TestLegacySkipGrillCount — p2-B: schema-drift 신호 end-to-end
