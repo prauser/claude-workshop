@@ -3,3 +3,8 @@ sandbox/
 .claude/*
 !.claude/rules/
 !.claude/settings.json
+
+# Python build artifacts
+__pycache__/
+*.pyc
+.pytest_cache/
